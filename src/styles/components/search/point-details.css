@@ -1,0 +1,89 @@
+.point-details__section {
+    margin-bottom: var(--spacing-md);
+    background-color: var(--color-background);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+}
+
+.point-details__subtitle {
+    color: var(--color-text);
+    font-size: var(--font-size-md);
+    margin-bottom: var(--spacing-sm);
+    font-weight: bold;
+}
+
+.point-details__text {
+    color: var(--color-text);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.point-details__list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.point-details__item {
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+    background-color: var(--color-background);
+}
+
+.point-details__link {
+    color: var(--color-text-light);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.point-details__link:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+} 
+
+
+/* Point details component */
+
+.point-details {
+    height: 80vh;
+    overflow-y: auto;
+    background-color: var(--color-background);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-md);
+    
+} 
+
+
+/* Stylizacja paska przewijania */
+.point-details::-webkit-scrollbar {
+    width: 8px;
+}
+
+.point-details::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.point-details::-webkit-scrollbar-thumb {
+    background-color: var(--color-primary);
+    border-radius: var(--border-radius-sm);
+}
+
+.point-details::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-primary-dark);
+} 
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .point-details {
+        margin-top: var(--spacing-sm);
+        padding: var(--spacing-sm);
+    }
+    
+    .point-details__title {
+        font-size: var(--font-size-base);
+    }
+    
+    .point-details__subtitle {
+        font-size: var(--font-size-sm);
+    }
+} 
