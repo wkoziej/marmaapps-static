@@ -95,7 +95,7 @@ reset role;
 -- Wyszukiwanie po nazwie (użytkownik z listy).
 -- ---------------------------------------------------------------------------
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 
 select results_eq(
   $$ select name from public.search_points_by_name('tala') $$,
@@ -175,7 +175,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (2, false, pg_temp.sim_vec(0.87)),
   (3, false, pg_temp.sim_vec(0.7));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text), ('Punkt B') $$,
@@ -195,7 +195,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (1, false, pg_temp.sim_vec(0.6)),
   (2, true, pg_temp.sim_vec(0.5));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select is_empty(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   'wektory: wszystkie similarity < 0.65 → brak wyników');
@@ -208,7 +208,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (2, false, pg_temp.sim_vec(0.82)),
   (3, false, pg_temp.sim_vec(0.79));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text), ('Punkt B') $$,
@@ -221,7 +221,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (1, false, pg_temp.sim_vec(0.9)),
   (6, false, pg_temp.sim_vec(0.88));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text) $$,
@@ -238,7 +238,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (4, false, pg_temp.sim_vec(0.91)),
   (5, false, pg_temp.sim_vec(0.905));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text), ('Punkt B'), ('Punkt C'), ('Punkt D') $$,
@@ -251,7 +251,7 @@ insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (1, false, pg_temp.sim_vec(0.9)),
   (2, false, pg_temp.sim_vec(0.5));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text) $$,
@@ -302,7 +302,7 @@ delete from public.subject_embeddings;
 insert into public.subject_embeddings (subject_id, is_polish, embedding) values
   (1, false, pg_temp.sim_vec(0.9));
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","email":"stranger@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","amr":[{"method":"otp"}],"email":"stranger@example.com","is_anonymous":false}';
 select is_empty(
   $$ select name from public.search_points_by_name('tala') $$,
   'spoza listy: nazwa → brak wyników');
@@ -317,7 +317,7 @@ reset role;
 
 -- Kontrola: ten sam stan danych dla użytkownika z listy daje wynik.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select results_eq(
   $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
   $$ values ('Punkt A'::text) $$,
