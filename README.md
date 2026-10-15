@@ -27,12 +27,47 @@ Bez pliku strona punktów działa, ale model się nie wczytuje (błąd w konsoli
 
 ## Frontend
 
-- Strony (wejścia Vite, multi-page w `vite.config.js`): `index.html` (start), `points.html` (model 3D i wyszukiwanie).
+- Strony (wejścia Vite, multi-page w `vite.config.js`): `index.html` (start: logowanie bez sesji, treść z sesją),
+  `points.html` (model 3D i wyszukiwanie, wymaga sesji), `login.html` (logowanie i powrót z linku lub z Google).
 - Kod w `src/`: `points.js` (start strony punktów), `home.js`, `layout.js` (nawigacja, wylogowanie), `config.js` (zmienne `VITE_*`),
   `services/ApiService.js` (funkcja Edge `search`), `features/search/`, `managers/`, `utils/`, `constants/` (teksty PL).
-- `src/auth/session.js`: punkt integracji sesji (`getAccessToken`, `onSessionExpired`, `signOut`). Logowanie dodaje U7.
+- `src/auth/`: `supabaseClient.js` (jeden klient), `sessionGuard.js` (strażnik stron), `loginPage.js` (formularz),
+  `redirects.js` (cel powrotu), `session.js` (`getAccessToken`, `onSessionExpired`, `signOut` dla `ApiService` i nawigacji).
 - three.js 0.128.0 z npm (`GLTFLoader`, `OrbitControls` z `three/examples/jsm`).
 - `BASE_PATH=/marmaapps-static/ npm run build` — build dla tymczasowego adresu GitHub Pages.
+
+## Logowanie
+
+Logowanie tylko bez haseł: link e-mail (magic link) albo Google. Klient Supabase (`src/auth/supabaseClient.js`)
+używa flow PKCE, trzyma sesję w `localStorage` i sam ją odświeża.
+
+1. `points.html` bez sesji przekierowuje do `login.html?next=points.html`. `index.html` bez sesji pokazuje formularz logowania.
+2. Link e-mail: `signInWithOtp` bez `shouldCreateUser: false` (przy pierwszym logowaniu konto jeszcze nie istnieje).
+   Adres spoza listy odrzuca hook „Before User Created” (403) — strona pokazuje komunikat o kontakcie z właścicielem.
+3. Link z e-maila i powrót z Google trafiają na `login.html?next=<cel>`. Klient wymienia kod z adresu na sesję,
+   a strona przechodzi do celu. Cel jest tylko nazwą strony z listy (`index.html`, `points.html`, strona startowa);
+   każda inna wartość (np. `https://…`, `//…`, `javascript:`) daje stronę startową.
+4. Błędy w adresie powrotu (query lub hash: `error`, `error_code`, `error_description`) dają komunikat:
+   link wygasł lub nieprawidłowy, brak dostępu (odmowa hooka), zbyt częste żądania, błąd Google.
+5. „Wyloguj” usuwa sesję tylko w tej przeglądarce (`scope: 'local'`). Odpowiedź 401 z funkcji `search`
+   lub nieudane odświeżenie sesji przekierowuje do logowania z celem.
+
+Ograniczenie PKCE: link z e-maila trzeba otworzyć w tej samej przeglądarce, w której poproszono o link
+(weryfikator jest w `localStorage`). W innej przeglądarce strona pokaże komunikat o nieprawidłowym linku.
+
+### Redirect URLs (panel Supabase → Authentication → URL Configuration)
+
+Lokalnie ustawia je `supabase/config.toml` (`site_url = http://localhost:5173`, wzorce `http://localhost:5173/**` i port 4173 dla `npm run preview`).
+W projekcie w chmurze:
+
+- Site URL: adres produkcyjny strony, np. `https://<domena>/` (do czasu przełączenia domeny: `https://wkoziej.github.io/marmaapps-static/`).
+- Redirect URLs (wzorce z `**`, bo adres powrotu zawiera `?next=`):
+  - `https://wkoziej.github.io/marmaapps-static/**` — tymczasowy adres GitHub Pages (`BASE_PATH=/marmaapps-static/`);
+  - `https://<domena>/**` — domena właściciela (`BASE_PATH=/`);
+  - opcjonalnie `http://localhost:5173/**` — praca lokalna z projektem w chmurze.
+
+Po przełączeniu domeny usuń wpis GitHub Pages. Google: w Google Cloud Console jako „Authorized redirect URI”
+podaj `https://<projekt>.supabase.co/auth/v1/callback` (nie adres strony).
 
 ## Testy
 

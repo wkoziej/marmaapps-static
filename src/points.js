@@ -8,6 +8,8 @@ import { SearchState } from './features/search/SearchState.js';
 import { initLayout } from './layout.js';
 import { supabaseConfig, humanModelPath } from './config.js';
 import { getAccessToken, onSessionExpired } from './auth/session.js';
+import { supabase } from './auth/supabaseClient.js';
+import { requireSession } from './auth/sessionGuard.js';
 import './styles/layout/layout.css';
 import './styles/components/search/search-bar.css';
 import './styles/components/search/search-results.css';
@@ -16,7 +18,8 @@ import './styles/components/model/model-controls.css';
 
 initLayout('points');
 
-document.addEventListener("DOMContentLoaded", () => {
+/** Inicjalizacja widoku 3D i wyszukiwania (tylko z sesją). Moduł działa po sparsowaniu DOM. */
+function initPointsPage() {
     // Inicjalizacja głównych komponentów
     const modelContainer = document.getElementById("l-model");
     const searchContainer = document.getElementById("search-bar");
@@ -78,5 +81,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Załadowanie modelu
     sceneManager.loadModel(humanModelPath)
         .catch(error => console.error(`${UiTexts.MODEL_LOAD_ERROR}:`, error));
+}
+
+// Strażnik sesji: bez sesji przekierowanie do login.html?next=points.html.
+const session = await requireSession({
+    auth: supabase.auth,
+    location: window.location,
+    baseUrl: import.meta.env.BASE_URL
 });
+if (session) {
+    initPointsPage();
+}
 
