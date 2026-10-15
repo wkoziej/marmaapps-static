@@ -2,6 +2,9 @@
  * @typedef {import('../../types/types').MarmaPoint} MarmaPoint
  */
 
+import { getPointDisplayName } from '../../utils/pointName.js';
+import { SectionTitles, UiTexts } from '../../constants/textConstants.js';
+
 /**
  * Widok zarządzający interfejsem użytkownika wyszukiwania.
  */
@@ -67,7 +70,7 @@ export class SearchView {
             this.resultsContainer.innerHTML = '';
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'search-results__loading';
-            loadingDiv.textContent = 'Szukam...';
+            loadingDiv.textContent = UiTexts.SEARCHING;
             this.resultsContainer.appendChild(loadingDiv);
             return;
         }
@@ -88,13 +91,17 @@ export class SearchView {
             if (state.selectedPoint) {
                 const items = this.resultsContainer.querySelectorAll('.search-results__item');
                 items.forEach(item => {
-                    if (item.textContent === state.selectedPoint.doc.names.join(', ')) {
+                    if (item.textContent === getPointDisplayName(state.selectedPoint)) {
                         item.classList.add('search-results__item--selected');
                     }
                 });
             }
         } else {
-            this.resultsContainer.innerHTML = '<div class="search-results__empty">Brak wyników</div>';
+            this.resultsContainer.innerHTML = '';
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'search-results__empty';
+            emptyDiv.textContent = UiTexts.EMPTY_RESULTS;
+            this.resultsContainer.appendChild(emptyDiv);
         }
 
         // Aktualizacja szczegółów punktu
@@ -129,7 +136,7 @@ export class SearchView {
         points.forEach(point => {
             const listItem = document.createElement('div');
             listItem.className = 'search-results__item';
-            listItem.textContent = point.doc.names.join(', ');
+            listItem.textContent = getPointDisplayName(point);
             listItem.addEventListener('click', () => {
                 this.handlePointClick(point, listItem);
             });
@@ -164,57 +171,60 @@ export class SearchView {
         if (!content) return;
 
         content.innerHTML = '';
+        // Punkt bez opisu ma doc = {} (lub null); wtedy lokalizacja z pola `location`.
+        const doc = point.doc ?? {};
+        const location = doc.location_in_polish || point.location;
         
         // Działania
-        if (point.doc.actions_in_polish) {
+        if (doc.actions_in_polish) {
             content.appendChild(this.createSection(
-                'Działania',
-                point.doc.actions_in_polish.split('\n'),
+                SectionTitles.ACTIONS,
+                doc.actions_in_polish.split('\n'),
                 true
             ));
         }
         
         // Wskazania
-        if (point.doc.indications_in_polish) {
+        if (doc.indications_in_polish) {
             content.appendChild(this.createSection(
-                'Wskazania',
-                point.doc.indications_in_polish.split('\n'),
+                SectionTitles.INDICATIONS,
+                doc.indications_in_polish.split('\n'),
                 true
             ));
         }
         
         // Typy poddoszy
-        if (point.doc.doshic_subtype_orig) {
+        if (doc.doshic_subtype_orig) {
             content.appendChild(this.createSection(
-                'Typy poddoszy',
-                point.doc.doshic_subtype_orig.split(','),
+                SectionTitles.DOSHIC_SUBTYPE,
+                doc.doshic_subtype_orig.split(','),
                 true
             ));
         }
         
         // Lokalizacja
-        if (point.doc.location_in_polish) {
+        if (location) {
             content.appendChild(this.createSection(
-                'Lokalizacja',
-                [point.doc.location_in_polish],
+                SectionTitles.LOCATION,
+                [location],
                 false
             ));
         }
         
         // Leczenie
-        if (point.doc.treatment_in_polish) {
+        if (doc.treatment_in_polish) {
             content.appendChild(this.createSection(
-                'Leczenie',
-                [point.doc.treatment_in_polish],
+                SectionTitles.TREATMENT,
+                [doc.treatment_in_polish],
                 false
             ));
         }
         
         // Komentarz
-        if (point.doc.commentary_in_polish) {
+        if (doc.commentary_in_polish) {
             content.appendChild(this.createSection(
-                'Komentarz',
-                [point.doc.commentary_in_polish],
+                SectionTitles.COMMENTARY,
+                [doc.commentary_in_polish],
                 false
             ));
         }

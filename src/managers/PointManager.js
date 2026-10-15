@@ -1,4 +1,5 @@
 import { createPoint, createLabel, clearCustomPoints, clearLabels } from "../utils/pointUtils.js";
+import { getPointDisplayName } from "../utils/pointName.js";
 
 /**
  * Klasa odpowiedzialna za zarządzanie punktami marma w scenie 3D.
@@ -38,7 +39,7 @@ export class PointManager {
         this.points = pointsData;
         
         pointsData.forEach(pointData => {
-            const names = pointData.doc.names.join(", ");
+            const names = getPointDisplayName(pointData);
             
             pointData.coordinates.forEach(coordinate => {
                 if (coordinate.label) {

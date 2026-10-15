@@ -140,6 +140,96 @@ describe('SearchView', () => {
         });
     });
     
+    describe('punkt bez opisu (pusty doc)', () => {
+        const emptyDocPoint = { name: 'Punkt A', location: 'Okolica B', doc: {}, coordinates: [] };
+
+        test('lista wyników pokazuje nazwę punktu', () => {
+            searchView.updateView({
+                isProcessing: false,
+                searchResults: [emptyDocPoint],
+                selectedPoint: null,
+                error: null
+            });
+
+            const items = resultsContainer.querySelectorAll('.search-results__item');
+            expect(items.length).toBe(1);
+            expect(items[0].textContent).toBe('Punkt A');
+        });
+
+        test('szczegóły pokazują lokalizację bez awarii', () => {
+            searchView.updateView({
+                isProcessing: false,
+                searchResults: [emptyDocPoint],
+                selectedPoint: emptyDocPoint,
+                error: null
+            });
+
+            expect(detailsContainer.style.display).toBe('block');
+            const subtitles = [...detailsContainer.querySelectorAll('.point-details__subtitle')].map(e => e.textContent);
+            expect(subtitles).toEqual(['Lokalizacja']);
+            expect(detailsContainer.querySelector('.point-details__text').textContent).toBe('Okolica B');
+            expect(resultsContainer.querySelector('.search-results__item--selected').textContent).toBe('Punkt A');
+        });
+
+        test('doc równy null nie powoduje awarii', () => {
+            const nullDocPoint = { ...emptyDocPoint, doc: null };
+
+            expect(() => searchView.updateView({
+                isProcessing: false,
+                searchResults: [nullDocPoint],
+                selectedPoint: nullDocPoint,
+                error: null
+            })).not.toThrow();
+            expect(resultsContainer.querySelector('.search-results__item').textContent).toBe('Punkt A');
+        });
+
+        test('lokalizacja z opisu ma pierwszeństwo przed polem location', () => {
+            const point = { ...emptyDocPoint, doc: { names: ['Punkt A'], location_in_polish: 'Opis lokalizacji' } };
+
+            searchView.updateView({ isProcessing: false, searchResults: [point], selectedPoint: point, error: null });
+
+            const texts = [...detailsContainer.querySelectorAll('.point-details__text')].map(e => e.textContent);
+            expect(texts).toEqual(['Opis lokalizacji']);
+        });
+    });
+
+    describe('błąd wyszukiwania', () => {
+        test('komunikat błędu zastępuje poprzednią listę wyników', () => {
+            searchView.updateView({
+                isProcessing: false,
+                searchResults: [{ name: 'Punkt A', doc: { names: ['Punkt A'] } }],
+                selectedPoint: null,
+                error: null
+            });
+
+            searchView.updateView({
+                isProcessing: false,
+                searchResults: [{ name: 'Punkt A', doc: { names: ['Punkt A'] } }],
+                selectedPoint: null,
+                error: 'Wyszukiwanie jest chwilowo niedostępne.'
+            });
+
+            expect(resultsContainer.querySelector('.search-results__item')).toBeNull();
+            expect(resultsContainer.querySelector('.search-results__error').textContent)
+                .toBe('Wyszukiwanie jest chwilowo niedostępne.');
+        });
+    });
+
+    describe('link wskazania w szczegółach', () => {
+        test('kliknięcie uruchamia nowe wyszukiwanie z tą frazą', () => {
+            const point = { name: 'Punkt A', doc: { names: ['Punkt A'], indications_in_polish: 'ból głowy\nbezsenność' } };
+            searchView.updateView({ isProcessing: false, searchResults: [point], selectedPoint: point, error: null });
+
+            const links = detailsContainer.querySelectorAll('.point-details__link');
+            expect([...links].map(l => l.textContent)).toEqual(['ból głowy', 'bezsenność']);
+
+            links[1].click();
+
+            expect(searchInput.value).toBe('bezsenność');
+            expect(controller.search).toHaveBeenCalledWith('bezsenność');
+        });
+    });
+
     describe('handlePointClick', () => {
         test('powinien zaktualizować zaznaczenie i wywołać kontroler', () => {
             const point = { doc: { names: ['Test Point'] } };

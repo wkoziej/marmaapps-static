@@ -2,12 +2,14 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SearchController } from '../SearchController.js';
 import { SearchState } from '../SearchState.js';
 import { ErrorMessages } from '../../../constants/textConstants.js';
+import { ApiError, SessionExpiredError } from '../../../services/ApiService.js';
 
 describe('SearchController', () => {
     let searchController;
     let searchState;
     let apiService;
     let pointManager;
+    let onSessionExpired;
     
     beforeEach(() => {
         // Przygotowanie mocków
@@ -21,8 +23,16 @@ describe('SearchController', () => {
             setSelectedPoint: vi.fn()
         };
         
+        onSessionExpired = vi.fn();
+
         // Inicjalizacja kontrolera
-        searchController = new SearchController(searchState, apiService, pointManager);
+        searchController = new SearchController(searchState, apiService, pointManager, onSessionExpired);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
     
     describe('search', () => {
@@ -73,6 +83,37 @@ describe('SearchController', () => {
             expect(searchState.isProcessing).toBe(false);
             expect(searchState.error).toBe(ErrorMessages.API_ERROR);
             expect(pointManager.clearPoints).toHaveBeenCalled();
+        });
+
+        test.each([
+            [400, ErrorMessages.BAD_REQUEST],
+            [502, ErrorMessages.SERVICE_UNAVAILABLE]
+        ])('powinien pokazać komunikat ApiError dla odpowiedzi %i', async (status, message) => {
+            apiService.getAnswer.mockRejectedValue(new ApiError(message, status));
+
+            await searchController.search('test');
+
+            expect(searchState.isProcessing).toBe(false);
+            expect(searchState.error).toBe(message);
+            expect(searchState.searchResults).toEqual([]);
+            expect(onSessionExpired).not.toHaveBeenCalled();
+        });
+
+        test('powinien zgłosić wygaśnięcie sesji dla SessionExpiredError', async () => {
+            apiService.getAnswer.mockRejectedValue(new SessionExpiredError());
+
+            await searchController.search('test');
+
+            expect(searchState.error).toBe(ErrorMessages.SESSION_EXPIRED);
+            expect(onSessionExpired).toHaveBeenCalledTimes(1);
+        });
+
+        test('powinien pokazać błąd API dla przekroczenia czasu', async () => {
+            apiService.getAnswer.mockRejectedValue(new Error('Request timed out'));
+
+            await searchController.search('test');
+
+            expect(searchState.error).toBe(ErrorMessages.API_ERROR);
         });
     });
     

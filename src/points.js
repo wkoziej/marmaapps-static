@@ -1,10 +1,20 @@
 import { SceneManager } from "./managers/SceneManager.js";
 import { PointManager } from "./managers/PointManager.js";
 import { ApiService } from "./services/ApiService.js";
-import { ErrorMessages } from './constants/textConstants.js';
+import { UiTexts } from './constants/textConstants.js';
 import { SearchController } from './features/search/SearchController.js';
 import { SearchView } from './features/search/SearchView.js';
 import { SearchState } from './features/search/SearchState.js';
+import { initLayout } from './layout.js';
+import { supabaseConfig, humanModelPath } from './config.js';
+import { getAccessToken, onSessionExpired } from './auth/session.js';
+import './styles/layout/layout.css';
+import './styles/components/search/search-bar.css';
+import './styles/components/search/search-results.css';
+import './styles/components/search/point-details.css';
+import './styles/components/model/model-controls.css';
+
+initLayout('points');
 
 document.addEventListener("DOMContentLoaded", () => {
     // Inicjalizacja głównych komponentów
@@ -19,22 +29,21 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
     
-    if (typeof window.humanModelPath === 'undefined') {
-        console.error("Nie znaleziono ścieżki do modelu 3D");
-        return;
-    }
-    
     const sceneManager = new SceneManager(modelContainer);
     const scene = sceneManager.getScene();
     
     const pointManager = new PointManager(scene, labelCheckbox);
     pointManager.clearPoints();
     
-    const apiService = new ApiService(`https://${window.location.hostname}`);
+    const apiService = new ApiService({
+        baseUrl: supabaseConfig.url,
+        apiKey: supabaseConfig.publishableKey,
+        getAccessToken
+    });
 
     // Inicjalizacja modułu wyszukiwania
     const searchState = new SearchState();
-    const searchController = new SearchController(searchState, apiService, pointManager);
+    const searchController = new SearchController(searchState, apiService, pointManager, onSessionExpired);
     const searchView = new SearchView(
         searchContainer,
         resultsContainer,
@@ -67,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Załadowanie modelu
-    sceneManager.loadModel(window.humanModelPath)
-        .catch(error => console.error("Error loading model:", error));
+    sceneManager.loadModel(humanModelPath)
+        .catch(error => console.error(`${UiTexts.MODEL_LOAD_ERROR}:`, error));
 });
 

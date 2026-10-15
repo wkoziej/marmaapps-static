@@ -41,4 +41,28 @@ describe('PointManager', () => {
     
     expect(scene.remove).toHaveBeenCalledWith(point);
   });
-}); 
+
+  test('nie rysuje współrzędnej bez etykiety (label)', () => {
+    pointManager.updatePoints([
+      {
+        name: 'Punkt A',
+        doc: { names: ['Punkt A'] },
+        coordinates: [
+          { x: 1, y: 2, z: 3, label: '' },
+          { x: 4, y: 5, z: 6, label: 'Punkt A' }
+        ]
+      }
+    ]);
+
+    const points = scene.add.mock.calls.filter(([obj]) => !obj.userData.isLabel);
+    expect(points.length).toBe(1);
+  });
+
+  test('punkt z pustym opisem jest rysowany z nazwą jako etykietą', () => {
+    expect(() => pointManager.updatePoints([
+      { name: 'Punkt A', doc: {}, coordinates: [{ x: 1, y: 2, z: 3, label: 'Punkt A' }] }
+    ])).not.toThrow();
+
+    expect(scene.add).toHaveBeenCalled();
+  });
+});

@@ -3,6 +3,7 @@
  */
 
 import { ErrorMessages } from '../../constants/textConstants.js';
+import { ApiError, SessionExpiredError } from '../../services/ApiService.js';
 
 /**
  * Kontroler zarządzający logiką wyszukiwania punktów marma.
@@ -12,11 +13,13 @@ export class SearchController {
      * @param {import('./SearchState').SearchState} searchState - Stan wyszukiwania
      * @param {import('../../services/ApiService').ApiService} apiService - Serwis API
      * @param {import('../../managers/PointManager').PointManager} pointManager - Manager punktów
+     * @param {() => void} [onSessionExpired] - Wywoływane po błędzie sesji (401); przekierowanie do logowania (U7)
      */
-    constructor(searchState, apiService, pointManager) {
+    constructor(searchState, apiService, pointManager, onSessionExpired = () => {}) {
         this.searchState = searchState;
         this.apiService = apiService;
         this.pointManager = pointManager;
+        this.onSessionExpired = onSessionExpired;
     }
 
     /**
@@ -64,7 +67,10 @@ export class SearchController {
             }
         } catch (error) {
             console.error('Search error:', error);
-            this.searchState.setError(ErrorMessages.API_ERROR);
+            if (error instanceof SessionExpiredError) {
+                this.onSessionExpired();
+            }
+            this.searchState.setError(error instanceof ApiError ? error.message : ErrorMessages.API_ERROR);
             this.pointManager.clearPoints();
         } finally {
             this.searchState.setProcessing(false);
