@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(22);
+select plan(24);
 
 insert into public.marma_points (id, name, location, doshic_subtypes, doc)
 values (1, 'Punkt Testowy', 'okolica', 'Vata', '{}'::jsonb);
@@ -73,6 +73,10 @@ select is(public.is_allowed(), false, 'amr=password: is_allowed() = false');
 select is((select count(*)::int from public.marma_points), 0, 'amr=password: 0 punktów');
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"oauth"}],"email":"allowed@example.com","is_anonymous":false}';
 select is(public.is_allowed(), true, 'amr=oauth (Google): is_allowed() = true');
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"email/signup"}],"email":"allowed@example.com","is_anonymous":false}';
+select is(public.is_allowed(), true, 'amr=email/signup (pierwsze logowanie linkiem, PKCE): is_allowed() = true');
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"recovery"}],"email":"allowed@example.com","is_anonymous":false}';
+select is(public.is_allowed(), false, 'amr=recovery: is_allowed() = false');
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
 select is(public.is_allowed(), false, 'brak amr: is_allowed() = false');
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"},{"method":"password"}],"email":"allowed@example.com","is_anonymous":false}';

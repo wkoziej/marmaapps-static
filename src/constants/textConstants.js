@@ -4,7 +4,7 @@ export const ErrorMessages = {
     API_ERROR: "Wystąpił błąd podczas pobierania danych",
     BAD_REQUEST: "Nieprawidłowa fraza wyszukiwania (pusta lub za długa)",
     SESSION_EXPIRED: "Sesja wygasła. Zaloguj się ponownie.",
-    FORBIDDEN: "Brak dostępu. Ten adres e-mail nie jest na liście dozwolonych.",
+    FORBIDDEN: "Brak dostępu do danych. Wyloguj się i zaloguj ponownie linkiem e-mail lub przez Google. Jeśli to nie pomoże, skontaktuj się z właścicielem.",
     TOO_MANY_REQUESTS: "Za dużo zapytań. Spróbuj ponownie za chwilę.",
     SERVICE_UNAVAILABLE: "Wyszukiwanie jest chwilowo niedostępne. Spróbuj ponownie później."
 };
