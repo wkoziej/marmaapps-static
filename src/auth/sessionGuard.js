@@ -43,6 +43,26 @@ export async function requireSession(deps) {
     return session;
 }
 
+/** Odsłania elementy `[data-auth="signed-in"]` (nawigacja, „Wyloguj”, treść strony). */
+function revealSignedIn(doc) {
+    doc.querySelectorAll('[data-auth="signed-in"]').forEach(element => {
+        element.hidden = false;
+    });
+}
+
+/**
+ * Strona chroniona (points.html): treść `[data-auth="signed-in"]` jest widoczna dopiero z sesją.
+ * @param {GuardDeps & { doc: Document }} deps
+ * @returns {Promise<Object|null>} Sesja albo `null` (trwa przekierowanie)
+ */
+export async function initProtectedPage({ doc, ...deps }) {
+    const session = await requireSession(deps);
+    if (session) {
+        revealSignedIn(doc);
+    }
+    return session;
+}
+
 /**
  * Strona startowa (index.html): bez sesji formularz logowania, z sesją treść aplikacji.
  * Elementy `[data-auth="signed-in"]` (nawigacja, „Wyloguj”) są widoczne tylko z sesją.
@@ -53,9 +73,7 @@ export async function initHomePage({ auth, doc, location, history, baseUrl }) {
     const session = data?.session ?? null;
 
     if (session) {
-        doc.querySelectorAll('[data-auth="signed-in"]').forEach(element => {
-            element.hidden = false;
-        });
+        revealSignedIn(doc);
         doc.getElementById('app-section').hidden = false;
         redirectOnSignOut({ auth, location, baseUrl });
         return session;

@@ -64,7 +64,8 @@ W projekcie w chmurze:
 - Redirect URLs (wzorce z `**`, bo adres powrotu zawiera `?next=`):
   - `https://wkoziej.github.io/marmaapps-static/**` — tymczasowy adres GitHub Pages (`BASE_PATH=/marmaapps-static/`);
   - `https://<domena>/**` — domena właściciela (`BASE_PATH=/`);
-  - opcjonalnie `http://localhost:5173/**` — praca lokalna z projektem w chmurze.
+  - opcjonalnie `http://localhost:5173/**` — praca lokalna z projektem w chmurze. Wpis tylko na czas tej pracy:
+    po jej zakończeniu usuń go z projektu produkcyjnego.
 
 Po przełączeniu domeny usuń wpis GitHub Pages. Google: w Google Cloud Console jako „Authorized redirect URI”
 podaj `https://<projekt>.supabase.co/auth/v1/callback` (nie adres strony).

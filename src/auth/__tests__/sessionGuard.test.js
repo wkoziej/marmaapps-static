@@ -5,8 +5,11 @@ import {
     loginUrl,
     pageUrl,
     requireSession,
-    initHomePage
+    initHomePage,
+    initProtectedPage
 } from '../sessionGuard.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createFakeAuth, createFakeLocation, SESSION } from './fakeSupabase.js';
 
 const BASE = '/marmaapps-static/';
@@ -102,6 +105,52 @@ describe('requireSession (strona punktów)', () => {
 
         auth.emit('SIGNED_OUT', null);
         expect(location.replace).toHaveBeenCalledWith('/marmaapps-static/login.html?next=points.html');
+    });
+});
+
+describe('initProtectedPage (points.html)', () => {
+    let location;
+
+    beforeEach(() => {
+        document.body.innerHTML = `
+            <button id="logout-button" data-auth="signed-in" hidden>Wyloguj</button>
+            <nav data-auth="signed-in" hidden></nav>
+            <main data-auth="signed-in" hidden>Punkty</main>`;
+        location = createFakeLocation(`${ORIGIN}/marmaapps-static/points.html`);
+    });
+
+    function signedInElements() {
+        return [...document.querySelectorAll('[data-auth="signed-in"]')];
+    }
+
+    test('z sesją → nawigacja, wylogowanie i treść widoczne', async () => {
+        const auth = createFakeAuth({ session: SESSION });
+
+        const session = await initProtectedPage({ auth, doc: document, location, baseUrl: BASE });
+
+        expect(session).toBe(SESSION);
+        expect(signedInElements().every(element => !element.hidden)).toBe(true);
+    });
+
+    test('bez sesji → treść zostaje ukryta, przekierowanie do logowania', async () => {
+        const auth = createFakeAuth({ session: null });
+
+        const session = await initProtectedPage({ auth, doc: document, location, baseUrl: BASE });
+
+        expect(session).toBeNull();
+        expect(signedInElements().every(element => element.hidden)).toBe(true);
+        expect(location.replace).toHaveBeenCalledWith('/marmaapps-static/login.html?next=points.html');
+    });
+
+    test('points.html: nawigacja, wylogowanie i main ukryte do sprawdzenia sesji', () => {
+        const html = readFileSync(resolve(process.cwd(), 'points.html'), 'utf8');
+        const page = new DOMParser().parseFromString(html, 'text/html');
+
+        for (const selector of ['#logout-button', 'nav', 'main']) {
+            const element = page.querySelector(selector);
+            expect(element.getAttribute('data-auth'), selector).toBe('signed-in');
+            expect(element.hidden, selector).toBe(true);
+        }
     });
 });
 

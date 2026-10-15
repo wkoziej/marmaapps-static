@@ -120,6 +120,10 @@ export async function initLoginPage({ auth, root, location, history, baseUrl }) 
     const showMessage = text => {
         messageElement.textContent = text;
     };
+    const form = root.querySelector('[data-testid="login-form"]');
+    const emailInput = root.querySelector('#login-email');
+    const emailButton = root.querySelector('[data-testid="login-email-button"]');
+    const googleButton = root.querySelector('[data-testid="login-google-button"]');
 
     const params = readUrlParams(location);
     const next = safeNext(params.next);
@@ -127,47 +131,33 @@ export async function initLoginPage({ auth, root, location, history, baseUrl }) 
     const returnUrl = new URL(loginUrl(baseUrl, next), location.origin).href;
     const goToTarget = () => location.replace(pageUrl(baseUrl, next));
 
-    const urlError = urlErrorMessage(params);
-    const hasCode = typeof params.code === 'string' && params.code !== '';
+    // Przyciski działają dopiero po getSession() i tylko wtedy, gdy nie trwa inne żądanie logowania.
+    let ready = false;
+    let busy = false;
+    const canStart = () => ready && !busy;
+    const updateButtons = () => {
+        emailButton.disabled = !canStart();
+        googleButton.disabled = !canStart();
+    };
+    const setBusy = value => {
+        busy = value;
+        updateButtons();
+    };
+    updateButtons();
 
-    // getSession() czeka na inicjalizację klienta, w tym na wymianę kodu PKCE z adresu (detectSessionInUrl).
-    // Dlatego parametry powrotu usuwamy z adresu dopiero po niej.
-    const { data } = await auth.getSession();
-    if (data?.session) {
-        goToTarget();
-        return;
-    }
-    if (urlError || hasCode || location.hash) {
-        removeCallbackParams(location, history);
-    }
-
-    if (urlError) {
-        showMessage(urlError);
-    } else if (hasCode) {
-        // Kod bez sesji: brak weryfikatora PKCE (link otwarty w innej przeglądarce) albo kod już zużyty.
-        showMessage(AuthMessages.LINK_INVALID);
-    }
-
-    // Logowanie w innej karcie tej przeglądarki (link z e-maila otwarty w nowej karcie).
-    auth.onAuthStateChange(event => {
-        if (event === 'SIGNED_IN') {
-            goToTarget();
-        }
-    });
-
-    const form = root.querySelector('[data-testid="login-form"]');
-    const emailInput = root.querySelector('#login-email');
-    const emailButton = root.querySelector('[data-testid="login-email-button"]');
-    const googleButton = root.querySelector('[data-testid="login-google-button"]');
-
+    // Obsługa podpięta od razu po renderze: bez niej szybkie wysłanie formularza robi natywny GET
+    // (adres e-mail w URL, utrata `?code=`).
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (!canStart()) {
+            return;
+        }
         const email = emailInput.value.trim();
         if (!email) {
             showMessage(AuthMessages.EMAIL_REQUIRED);
             return;
         }
-        emailButton.disabled = true;
+        setBusy(true);
         showMessage(AuthMessages.SENDING);
         try {
             // Bez `shouldCreateUser: false`: przy pierwszym logowaniu konto jeszcze nie istnieje.
@@ -177,18 +167,61 @@ export async function initLoginPage({ auth, root, location, history, baseUrl }) 
         } catch (error) {
             showMessage(authErrorMessage(error));
         } finally {
-            emailButton.disabled = false;
+            setBusy(false);
         }
     });
 
     googleButton.addEventListener('click', async () => {
+        if (!canStart()) {
+            return;
+        }
+        setBusy(true);
         try {
             const { error } = await auth.signInWithOAuth({ provider: 'google', options: { redirectTo: returnUrl } });
             if (error) {
                 showMessage(authErrorMessage(error));
+                setBusy(false);
             }
+            // Bez błędu trwa przekierowanie do Google: przyciski zostają wyłączone.
         } catch (error) {
             showMessage(authErrorMessage(error));
+            setBusy(false);
         }
     });
+
+    const urlError = urlErrorMessage(params);
+    const hasCode = typeof params.code === 'string' && params.code !== '';
+
+    // getSession() czeka na inicjalizację klienta, w tym na wymianę kodu PKCE z adresu (detectSessionInUrl).
+    // Dlatego parametry powrotu usuwamy z adresu dopiero po niej.
+    const { data, error: sessionError } = await auth.getSession();
+    if (data?.session) {
+        goToTarget();
+        return;
+    }
+
+    if (sessionError) {
+        // Np. błąd sieci: `code` zostaje w adresie, aby odświeżenie strony mogło ponowić wymianę.
+        showMessage(AuthMessages.NETWORK);
+    } else {
+        if (urlError || hasCode || location.hash) {
+            removeCallbackParams(location, history);
+        }
+        if (urlError) {
+            showMessage(urlError);
+        } else if (hasCode) {
+            // Kod bez sesji: brak weryfikatora PKCE (link otwarty w innej przeglądarce) albo kod już zużyty.
+            showMessage(AuthMessages.LINK_INVALID);
+        }
+    }
+
+    // Logowanie w innej karcie tej przeglądarki (link z e-maila otwarty w nowej karcie).
+    auth.onAuthStateChange(event => {
+        if (event === 'SIGNED_IN') {
+            goToTarget();
+        }
+    });
+
+    ready = true;
+    updateButtons();
 }

@@ -6,6 +6,7 @@ import {
     createFakeLocation,
     authApiError,
     networkError,
+    deferred,
     SESSION
 } from './fakeSupabase.js';
 
@@ -22,10 +23,21 @@ function message() {
     return document.querySelector('[data-testid="login-message"]').textContent;
 }
 
+/** @returns {Event} Wysłane zdarzenie (sprawdzenie `defaultPrevented`). */
 async function submitEmail(email) {
     document.querySelector('#login-email').value = email;
-    document.querySelector('[data-testid="login-form"]').dispatchEvent(new Event('submit', { cancelable: true }));
+    const event = new Event('submit', { cancelable: true });
+    document.querySelector('[data-testid="login-form"]').dispatchEvent(event);
     await flush();
+    return event;
+}
+
+function emailButton() {
+    return document.querySelector('[data-testid="login-email-button"]');
+}
+
+function googleButton() {
+    return document.querySelector('[data-testid="login-google-button"]');
 }
 
 describe('initLoginPage', () => {
@@ -110,6 +122,88 @@ describe('initLoginPage', () => {
             await submitEmail('osoba@example.com');
 
             expect(auth.signInWithOtp.mock.calls[0][0].options.emailRedirectTo).toBe(LOGIN);
+        });
+    });
+
+    describe('przed zakończeniem getSession()', () => {
+        test('formularz jest widoczny, ale wysłanie nie robi natywnego GET ani żądania, przyciski wyłączone', async () => {
+            const auth = createFakeAuth({ deferSession: true });
+            const location = createFakeLocation(`${LOGIN}?code=abc&next=points.html`);
+
+            const done = initLoginPage({ auth, root, location, history, baseUrl: BASE });
+
+            expect(emailButton().disabled).toBe(true);
+            expect(googleButton().disabled).toBe(true);
+            const event = await submitEmail('osoba@example.com');
+            googleButton().dispatchEvent(new Event('click'));
+            await flush();
+            expect(event.defaultPrevented).toBe(true);
+            expect(auth.signInWithOtp).not.toHaveBeenCalled();
+            expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+
+            auth.resolveSession();
+            await done;
+
+            expect(emailButton().disabled).toBe(false);
+            expect(googleButton().disabled).toBe(false);
+        });
+    });
+
+    describe('blokada podczas żądania', () => {
+        test('link e-mail w toku → oba przyciski wyłączone, drugie wysłanie i Google bez żądania', async () => {
+            const { auth } = await open(LOGIN);
+            const request = deferred();
+            auth.signInWithOtp.mockImplementation(() => request.promise);
+
+            await submitEmail('osoba@example.com');
+            expect(emailButton().disabled).toBe(true);
+            expect(googleButton().disabled).toBe(true);
+            await submitEmail('osoba@example.com');
+            googleButton().dispatchEvent(new Event('click'));
+            await flush();
+            expect(auth.signInWithOtp).toHaveBeenCalledTimes(1);
+            expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+
+            request.resolve({ data: {}, error: null });
+            await flush();
+
+            expect(emailButton().disabled).toBe(false);
+            expect(googleButton().disabled).toBe(false);
+        });
+
+        test('Google w toku → oba przyciski wyłączone, drugie kliknięcie i formularz bez żądania', async () => {
+            const { auth } = await open(LOGIN);
+            const request = deferred();
+            auth.signInWithOAuth.mockImplementation(() => request.promise);
+
+            googleButton().click();
+            await flush();
+            expect(emailButton().disabled).toBe(true);
+            expect(googleButton().disabled).toBe(true);
+            googleButton().dispatchEvent(new Event('click'));
+            await submitEmail('osoba@example.com');
+            expect(auth.signInWithOAuth).toHaveBeenCalledTimes(1);
+            expect(auth.signInWithOtp).not.toHaveBeenCalled();
+        });
+
+        test('Google bez błędu (trwa przekierowanie) → przyciski zostają wyłączone', async () => {
+            await open(LOGIN);
+
+            googleButton().click();
+            await flush();
+
+            expect(emailButton().disabled).toBe(true);
+            expect(googleButton().disabled).toBe(true);
+        });
+
+        test('Google z błędem → przyciski znowu włączone', async () => {
+            await open(LOGIN, { oauthError: authApiError(400, 'validation_failed') });
+
+            googleButton().click();
+            await flush();
+
+            expect(emailButton().disabled).toBe(false);
+            expect(googleButton().disabled).toBe(false);
         });
     });
 
@@ -201,6 +295,14 @@ describe('initLoginPage', () => {
             const { location } = await open(`${LOGIN}?code=abc&next=points.html`);
 
             expect(message()).toBe(AuthMessages.LINK_INVALID);
+            expect(location.replace).not.toHaveBeenCalled();
+        });
+
+        test('błąd getSession() (np. sieć przy wymianie kodu) → kod zostaje w adresie, komunikat o połączeniu', async () => {
+            const { location } = await open(`${LOGIN}?code=abc&next=points.html`, { sessionError: networkError() });
+
+            expect(history.replaceState).not.toHaveBeenCalled();
+            expect(message()).toBe(AuthMessages.NETWORK);
             expect(location.replace).not.toHaveBeenCalled();
         });
 

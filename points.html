@@ -15,7 +15,7 @@
             <h1 class="text-2xl font-bold">Marma Applications</h1>
             <div class="flex items-center space-x-4">
                 <!-- Wylogowanie: src/auth/session.js. Strona wymaga sesji (src/auth/sessionGuard.js). -->
-                <button type="button" id="logout-button" data-testid="logout-button"
+                <button type="button" id="logout-button" data-testid="logout-button" data-auth="signed-in" hidden
                     class="flex items-center bg-transparent border-none text-white cursor-pointer">
                     <i data-lucide="log-out" class="mr-2"></i>
                     Wyloguj
@@ -25,7 +25,7 @@
     </header>
 
     <!-- Nawigacja -->
-    <nav class="bg-blue-500 text-white">
+    <nav class="bg-blue-500 text-white" data-auth="signed-in" hidden>
         <div class="container mx-auto flex">
             <a href="./" data-nav="home" class="flex items-center p-4">
                 <i data-lucide="house" class="mr-2"></i>
@@ -38,7 +38,7 @@
         </div>
     </nav>
 
-    <main>
+    <main data-auth="signed-in" hidden>
         <div class="l-pointsdb" id="l-pointsdb">
             <div class="l-ui" id="l-ui">
                 <div class="search-bar" id="search-bar" data-testid="search-container">

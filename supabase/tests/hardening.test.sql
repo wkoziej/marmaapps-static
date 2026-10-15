@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(25);
 
 insert into public.marma_points (id, name, location, doshic_subtypes, doc)
 values (1, 'Punkt Testowy', 'okolica', 'Vata', '{}'::jsonb);
@@ -81,6 +81,8 @@ set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","r
 select is(public.is_allowed(), false, 'brak amr: is_allowed() = false');
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"},{"method":"password"}],"email":"allowed@example.com","is_anonymous":false}';
 select is(public.is_allowed(), false, 'amr z otp i password: is_allowed() = false');
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"email/signup"},{"method":"password"}],"email":"allowed@example.com","is_anonymous":false}';
+select is(public.is_allowed(), false, 'amr z email/signup i password: is_allowed() = false');
 reset role;
 
 select * from finish();
