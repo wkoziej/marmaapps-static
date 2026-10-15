@@ -215,6 +215,54 @@ describe('SearchView', () => {
         });
     });
 
+    describe('panel szczegółów bez wybranego punktu', () => {
+        const point = { name: 'Punkt A', location: 'Okolica B', doc: {}, coordinates: [] };
+
+        beforeEach(() => {
+            searchView.updateView({ isProcessing: false, searchResults: [point], selectedPoint: point, error: null });
+            expect(detailsContainer.style.display).toBe('block');
+        });
+
+        test('sukces → błąd ukrywa panel szczegółów', () => {
+            searchView.updateView({ isProcessing: true, searchResults: [], selectedPoint: null, error: null });
+            searchView.updateView({ isProcessing: false, searchResults: [], selectedPoint: null, error: 'Błąd' });
+
+            expect(detailsContainer.style.display).toBe('none');
+            expect(resultsContainer.querySelector('.search-results__item')).toBeNull();
+        });
+
+        test('sukces → brak wyników ukrywa panel szczegółów', () => {
+            searchView.updateView({ isProcessing: false, searchResults: [], selectedPoint: null, error: 'Nie znaleziono odpowiedzi' });
+
+            expect(detailsContainer.style.display).toBe('none');
+        });
+
+        test('stan ładowania ukrywa panel szczegółów', () => {
+            searchView.updateView({ isProcessing: true, searchResults: [], selectedPoint: null, error: null });
+
+            expect(detailsContainer.style.display).toBe('none');
+        });
+    });
+
+    describe('XSS', () => {
+        test('pola punktu z kodem HTML renderują się jako tekst', () => {
+            const payload = '<img src=x onerror=alert(1)>';
+            const point = {
+                name: payload,
+                location: payload,
+                doc: { names: [payload], location_in_polish: payload, indications_in_polish: payload },
+                coordinates: []
+            };
+
+            searchView.updateView({ isProcessing: false, searchResults: [point], selectedPoint: point, error: null });
+
+            expect(document.querySelector('img')).toBeNull();
+            expect(resultsContainer.querySelector('.search-results__item').textContent).toBe(payload);
+            expect(detailsContainer.querySelector('.point-details__link').textContent).toBe(payload);
+            expect(detailsContainer.querySelector('.point-details__text').textContent).toBe(payload);
+        });
+    });
+
     describe('link wskazania w szczegółach', () => {
         test('kliknięcie uruchamia nowe wyszukiwanie z tą frazą', () => {
             const point = { name: 'Punkt A', doc: { names: ['Punkt A'], indications_in_polish: 'ból głowy\nbezsenność' } };

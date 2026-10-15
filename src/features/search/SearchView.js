@@ -65,6 +65,11 @@ export class SearchView {
         // Aktualizacja stanu ładowania
         this.searchButton.textContent = state.isProcessing ? '⌛' : '🔍';
 
+        // Bez wybranego punktu panel szczegółów jest ukryty (także w stanie ładowania i błędu)
+        if (!state.selectedPoint) {
+            this.detailsContainer.style.display = 'none';
+        }
+
         // Jeśli trwa ładowanie, pokaż stan ładowania i zakończ
         if (state.isProcessing) {
             this.resultsContainer.innerHTML = '';
@@ -107,8 +112,6 @@ export class SearchView {
         // Aktualizacja szczegółów punktu
         if (state.selectedPoint) {
             this.updatePointDetails(state.selectedPoint);
-        } else {
-            this.detailsContainer.style.display = 'none';
         }
     }
 

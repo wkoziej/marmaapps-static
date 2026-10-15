@@ -117,6 +117,49 @@ describe('SearchController', () => {
         });
     });
     
+    describe('stare dane po kolejnym wyszukiwaniu', () => {
+        const point = { name: 'Punkt A', doc: {}, coordinates: [] };
+        let seen;
+
+        beforeEach(async () => {
+            seen = [];
+            apiService.getAnswer.mockResolvedValueOnce({ points: [point] });
+            await searchController.search('pierwsze');
+            searchController.handlePointClick(point);
+            searchState.addListener(state => seen.push([...state.searchResults]));
+        });
+
+        test('sukces → błąd API czyści wyniki i wybrany punkt', async () => {
+            apiService.getAnswer.mockRejectedValueOnce(new ApiError(ErrorMessages.SERVICE_UNAVAILABLE, 502));
+
+            await searchController.search('drugie');
+
+            expect(searchState.searchResults).toEqual([]);
+            expect(searchState.selectedPoint).toBeNull();
+            expect(searchState.error).toBe(ErrorMessages.SERVICE_UNAVAILABLE);
+            expect(seen.at(-1)).toEqual([]);
+        });
+
+        test('sukces → brak wyników czyści wyniki i wybrany punkt', async () => {
+            apiService.getAnswer.mockResolvedValueOnce({ points: [] });
+
+            await searchController.search('drugie');
+
+            expect(searchState.searchResults).toEqual([]);
+            expect(searchState.selectedPoint).toBeNull();
+            expect(searchState.error).toBe(ErrorMessages.NO_RESULTS);
+            expect(seen.at(-1)).toEqual([]);
+        });
+
+        test('sukces → pusta fraza czyści wyniki i wybrany punkt', async () => {
+            await searchController.search('  ');
+
+            expect(searchState.searchResults).toEqual([]);
+            expect(searchState.selectedPoint).toBeNull();
+            expect(seen.at(-1)).toEqual([]);
+        });
+    });
+
     describe('handlePointClick', () => {
         test('powinien zaktualizować wybrany punkt', () => {
             const mockPoint = { doc: { names: ['Test Point'] } };

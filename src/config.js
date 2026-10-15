@@ -7,7 +7,7 @@ export const supabaseConfig = {
     publishableKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''
 };
 
-if (!supabaseConfig.url || !supabaseConfig.publishableKey) {
+if (import.meta.env.MODE !== 'test' && (!supabaseConfig.url || !supabaseConfig.publishableKey)) {
     console.error('Brak VITE_SUPABASE_URL lub VITE_SUPABASE_PUBLISHABLE_KEY (zob. .env.example).');
 }
 

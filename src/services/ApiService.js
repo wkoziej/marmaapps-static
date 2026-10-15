@@ -58,12 +58,14 @@ export class ApiService {
     }
 
     /**
-     * Wykonuje zapytanie do API z obsługą timeoutu
+     * Wykonuje zapytanie do API z obsługą timeoutu (limit obejmuje także odczyt treści)
+     * @template T
      * @param {string} url - URL endpointu
      * @param {Object} headers - Nagłówki żądania
-     * @returns {Promise<Response>} Odpowiedź HTTP
+     * @param {(response: Response) => Promise<T>} readResponse - Obsługa odpowiedzi (status, treść)
+     * @returns {Promise<T>} Wynik `readResponse`
      */
-    async fetchWithTimeout(url, headers) {
+    async fetchWithTimeout(url, headers, readResponse) {
         const controller = new AbortController();
         let timer;
         const timeoutPromise = new Promise((_, reject) => {
@@ -74,8 +76,9 @@ export class ApiService {
         });
 
         try {
-            const fetchPromise = this.fetchFn(url, { method: 'GET', headers, signal: controller.signal });
-            return await Promise.race([fetchPromise, timeoutPromise]);
+            const requestPromise = this.fetchFn(url, { method: 'GET', headers, signal: controller.signal })
+                .then(readResponse);
+            return await Promise.race([requestPromise, timeoutPromise]);
         } finally {
             clearTimeout(timer);
         }
@@ -96,20 +99,28 @@ export class ApiService {
             }
 
             const url = `${this.baseUrl}${SEARCH_PATH}?problem=${encodeURIComponent(problem)}`;
-            const response = await this.fetchWithTimeout(url, {
+            return await this.fetchWithTimeout(url, {
                 Authorization: `Bearer ${token}`,
                 apikey: this.apiKey
+            }, async (response) => {
+                if (response.status === 401) {
+                    throw new SessionExpiredError();
+                }
+                if (!response.ok) {
+                    throw new ApiError(STATUS_MESSAGES[response.status] ?? ErrorMessages.API_ERROR, response.status);
+                }
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    throw new ApiError(ErrorMessages.API_ERROR, response.status);
+                }
+                if (typeof data?.answer !== 'object' || data.answer === null) {
+                    throw new ApiError(ErrorMessages.API_ERROR, response.status);
+                }
+                return data.answer;
             });
-
-            if (response.status === 401) {
-                throw new SessionExpiredError();
-            }
-            if (!response.ok) {
-                throw new ApiError(STATUS_MESSAGES[response.status] ?? ErrorMessages.API_ERROR, response.status);
-            }
-
-            const data = await response.json();
-            return data.answer;
         } catch (error) {
             console.error('API request failed:', error);
             throw error;

@@ -113,6 +113,37 @@ describe('ApiService', () => {
             expect(signal.aborted).toBe(true);
         });
 
+        test('przekroczenie czasu podczas odczytu treści → "Request timed out"', async () => {
+            vi.useFakeTimers();
+            fetchFn.mockResolvedValue({ ok: true, status: 200, json: () => new Promise(() => {}) });
+            api = new ApiService({ baseUrl: BASE_URL, apiKey: API_KEY, getAccessToken, fetchFn, timeout: 1000 });
+
+            const pending = api.getAnswer('Tala').catch(e => e);
+            await vi.advanceTimersByTimeAsync(1000);
+            const error = await pending;
+
+            expect(error).toBeInstanceOf(Error);
+            expect(error.message).toBe('Request timed out');
+        });
+
+        test('200 z niepoprawnym JSON → ApiError', async () => {
+            fetchFn.mockResolvedValue(new Response('<html>nie JSON</html>', { status: 200 }));
+
+            const error = await api.getAnswer('Tala').catch(e => e);
+
+            expect(error).toBeInstanceOf(ApiError);
+            expect(error.message).toBe(ErrorMessages.API_ERROR);
+        });
+
+        test('200 bez pola answer → ApiError', async () => {
+            fetchFn.mockResolvedValue(jsonResponse(200, { inne: 1 }));
+
+            const error = await api.getAnswer('Tala').catch(e => e);
+
+            expect(error).toBeInstanceOf(ApiError);
+            expect(error.message).toBe(ErrorMessages.API_ERROR);
+        });
+
         test('błąd sieci jest przekazywany dalej', async () => {
             fetchFn.mockRejectedValue(new TypeError('Failed to fetch'));
 

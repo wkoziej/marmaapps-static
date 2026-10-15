@@ -59,10 +59,13 @@ describe('PointManager', () => {
   });
 
   test('punkt z pustym opisem jest rysowany z nazwą jako etykietą', () => {
-    expect(() => pointManager.updatePoints([
-      { name: 'Punkt A', doc: {}, coordinates: [{ x: 1, y: 2, z: 3, label: 'Punkt A' }] }
-    ])).not.toThrow();
+    const addPoint = vi.spyOn(pointManager, 'addPoint');
 
-    expect(scene.add).toHaveBeenCalled();
+    pointManager.updatePoints([
+      { name: 'Punkt A', doc: {}, coordinates: [{ x: 1, y: 2, z: 3, label: 'etykieta współrzędnej' }] }
+    ]);
+
+    expect(addPoint).toHaveBeenCalledTimes(1);
+    expect(addPoint.mock.calls[0][0]).toBe('Punkt A');
   });
 });

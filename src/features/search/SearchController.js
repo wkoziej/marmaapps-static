@@ -38,6 +38,7 @@ export class SearchController {
      */
     async search(searchText) {
         if (!searchText?.trim()) {
+            this.clearResults();
             this.searchState.setError(ErrorMessages.NO_INPUT);
             this.pointManager.clearPoints();
             return;
@@ -49,14 +50,10 @@ export class SearchController {
 
         try {
             this.searchState.setProcessing(true);
-            this.searchState.setSelectedPoint(null);
-            this.pointManager.clearPoints();
+            this.clearResults();
             
             const answer = await this.apiService.getAnswer(searchText);
-            console.log('API response:', answer);
-            
             const points = answer?.points || [];
-            console.log('Points:', points);
 
             if (points.length > 0) {
                 this.searchState.setSearchResults(points);
@@ -75,6 +72,15 @@ export class SearchController {
         } finally {
             this.searchState.setProcessing(false);
         }
+    }
+
+    /**
+     * Usuwa poprzednie wyniki i wybrany punkt (scena 3D i panel szczegółów nie pokazują starych danych)
+     */
+    clearResults() {
+        this.searchState.setSelectedPoint(null);
+        this.searchState.setSearchResults([]);
+        this.pointManager.clearPoints();
     }
 
     /**
