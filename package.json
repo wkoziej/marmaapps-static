@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:guard": "scripts/tests/check-no-data.test.sh",
+    "test:functions": "deno test --config supabase/functions/search/deno.json supabase/functions/search/",
+    "check:functions": "deno check --config supabase/functions/search/deno.json supabase/functions/search/index.ts",
     "check:data": "scripts/check-no-data.sh --all",
     "prepare": "simple-git-hooks"
   },

@@ -77,3 +77,19 @@ jobs:
         run: npx supabase db start
       - name: pgTAP
         run: npx supabase test db
+
+  functions:
+    name: Testy funkcji Edge (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Fałszywe klienty bazy i OpenAI; bez sekretów i bez sieci do OpenAI.
+      - name: deno test
+        run: npm run test:functions
+      - name: deno check (index.ts, zależności z deno.lock)
+        run: npm run check:functions
