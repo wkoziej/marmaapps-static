@@ -8,8 +8,29 @@ revoke all on schema private from public, anon, authenticated;
 create table private.allowed_emails (
   email text not null primary key,
   created_at timestamptz not null default now(),
-  constraint allowed_emails_email_not_blank check (btrim(email) <> '')
+  -- Wpis jest przechowywany po normalizacji (trigger niżej): małe litery, bez białych znaków.
+  constraint allowed_emails_email_normalized check (
+    email = lower(email) and email !~ '[[:space:]\u00a0]' and email ~ '^[^@]+@[^@]+$'
+  )
 );
+
+-- Adres wklejony w panelu Supabase może mieć wielkie litery, spacje, tabulatory lub NBSP.
+create or replace function private.normalize_allowed_email()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.email := lower(regexp_replace(new.email, '[[:space:]\u00a0]', '', 'g'));
+  return new;
+end;
+$$;
+
+revoke execute on function private.normalize_allowed_email() from public, anon, authenticated;
+
+create trigger allowed_emails_normalize
+  before insert or update of email on private.allowed_emails
+  for each row execute function private.normalize_allowed_email();
 
 -- Porównanie bez rozróżniania wielkości liter: jeden wpis na adres niezależnie od liter.
 create unique index allowed_emails_email_lower_idx on private.allowed_emails (lower(btrim(email)));
@@ -50,3 +71,4 @@ revoke execute on function private.before_user_created_hook(jsonb) from public, 
 grant usage on schema private to supabase_auth_admin;
 grant select on table private.allowed_emails to supabase_auth_admin;
 grant execute on function private.before_user_created_hook(jsonb) to supabase_auth_admin;
+

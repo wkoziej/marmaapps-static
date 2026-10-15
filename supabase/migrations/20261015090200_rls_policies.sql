@@ -7,6 +7,7 @@
 -- JWT Supabase nie ma pewnego claimu potwierdzenia adresu (email_verified jest tylko
 -- w user_metadata), dlatego potwierdzenie jest sprawdzane w auth.users dla auth.uid():
 -- konto musi mieć email_confirmed_at i ten sam adres co claim `email`.
+-- Metoda logowania z claimu `amr`: tylko otp/magiclink/oauth (bez haseł).
 -- Zwraca tylko true/false; nie ujawnia listy.
 create or replace function public.is_allowed()
 returns boolean
@@ -18,6 +19,14 @@ as $$
   select coalesce(
     (auth.jwt() ->> 'role') = 'authenticated'
     and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    -- Tylko sesje bez hasła (link e-mail, Google). Ktoś mógł założyć konto z hasłem
+    -- na adres z listy, zanim właściciel adresu potwierdził je linkiem.
+    and jsonb_typeof(auth.jwt() -> 'amr') = 'array'
+    and jsonb_array_length(auth.jwt() -> 'amr') > 0
+    and not exists (
+      select 1 from jsonb_array_elements(auth.jwt() -> 'amr') m
+      where m ->> 'method' is null or m ->> 'method' not in ('otp', 'magiclink', 'oauth')
+    )
     and exists (
       select 1
       from auth.users u
@@ -58,3 +67,12 @@ $$;
 
 -- Sekwencje kolumn identity: brak dostępu dla anon i authenticated.
 revoke all on all sequences in schema public from anon, authenticated;
+
+-- Nowe obiekty w schemacie public (tworzone przez rolę migracji) nie dostają
+-- domyślnych uprawnień Supabase dla anon i authenticated. Każda kolejna migracja
+-- nadaje uprawnienia jawnie (CLAUDE.md).
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
+-- Wbudowane (globalne) prawo PUBLIC do wykonywania nowych funkcji.
+alter default privileges revoke execute on functions from public;

@@ -41,3 +41,14 @@ Adresów nie zapisuj w repozytorium ani w skryptach (zob. `CLAUDE.md`).
 
 Na projekcie Supabase hook trzeba włączyć raz: Authentication → Hooks → Before User Created →
 Postgres, funkcja `private.before_user_created_hook`. Lokalnie włącza go `supabase/config.toml`.
+
+## Wymagane ustawienia Auth w projekcie Supabase
+
+Lokalnie ustawia je `supabase/config.toml`. W projekcie w chmurze trzeba je ustawić w panelu (pełna lista: `docs/supabase-setup.md`, U8):
+
+- Authentication → Hooks → „Before User Created” → funkcja `private.before_user_created_hook`. **Bez hooka każdy może założyć konto** (dane nadal chroni RLS).
+- Authentication → Providers → Email → „Confirm email” włączone.
+
+Ochrona danych nie zależy od samego hooka. `public.is_allowed()` wymaga: potwierdzonego adresu z listy, adresu z JWT zgodnego z kontem i sesji bez hasła (claim `amr`: `otp`, `magiclink` lub `oauth`). Sesja z logowania hasłem nie widzi danych, nawet jeśli ktoś założył konto z hasłem na adres z listy.
+
+Test dymny po każdej zmianie ustawień Auth: prośba o link dla adresu spoza listy (np. `nikt@example.com`) zwraca 403.

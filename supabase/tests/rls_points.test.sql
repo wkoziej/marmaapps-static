@@ -70,32 +70,32 @@ reset role;
 
 -- Użytkownik spoza listy (konto sprzed zmiany listy) → 0 wierszy.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","email":"stranger@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","amr":[{"method":"otp"}],"email":"stranger@example.com","is_anonymous":false}';
 select is((select count(*)::int from public.marma_points), 0, 'spoza listy: 0 punktów');
 select is((select count(*)::int from public.subject_embeddings), 0, 'spoza listy: 0 wektorów');
 reset role;
 
 -- Adres z listy tylko w user_metadata, inny email w JWT → 0 wierszy.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","email":"stranger@example.com","is_anonymous":false,"user_metadata":{"email":"allowed@example.com","email_verified":true}}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","amr":[{"method":"otp"}],"email":"stranger@example.com","is_anonymous":false,"user_metadata":{"email":"allowed@example.com","email_verified":true}}';
 select is((select count(*)::int from public.marma_points), 0, 'adres z listy tylko w user_metadata: 0 wierszy');
 reset role;
 
 -- Adres z listy, ale niepotwierdzony → 0 wierszy.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated","email":"allowed2@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed2@example.com","is_anonymous":false}';
 select is((select count(*)::int from public.marma_points), 0, 'adres niepotwierdzony: 0 wierszy');
 reset role;
 
 -- Email w JWT z listy, ale nie pasuje do konta (sub) → 0 wierszy.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select is((select count(*)::int from public.marma_points), 0, 'email w JWT inny niż w koncie: 0 wierszy');
 reset role;
 
 -- Użytkownik z listy (inna wielkość liter na liście) → widzi wszystko.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select ok(public.is_allowed(), 'z listy: is_allowed() = true');
 select is((select count(*)::int from public.marma_points), 1, 'z listy: widzi punkty');
 select is((select doc ->> 'location_in_polish' from public.marma_points where id = 1), 'okolica testowa', 'z listy: widzi opis');
@@ -120,7 +120,7 @@ reset role;
 -- R7: usunięcie adresu z listy → ten sam użytkownik traci dostęp przy kolejnym zapytaniu.
 delete from private.allowed_emails where lower(email) = 'allowed@example.com';
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","email":"allowed@example.com","is_anonymous":false}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
 select is((select count(*)::int from public.marma_points), 0, 'po usunięciu z listy: 0 punktów');
 reset role;
 
