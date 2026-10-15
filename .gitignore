@@ -30,5 +30,9 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Model 3D: licencja niepotwierdzona, kopia tylko lokalnie (zob. README.md)
-public/models/human.glb
+# Test regresji E2E: sesja (tokeny) i raporty (mogą zawierać opisy punktów)
+e2e/.auth/
+test-results/
+playwright-report/
+blob-report/
+

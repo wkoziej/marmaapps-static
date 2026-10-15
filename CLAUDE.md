@@ -20,13 +20,14 @@ Dozwolone:
 Zasady:
 - Eksporty tylko w `data-export/` (wykluczone z git). Po migracji katalog jest usuwany lub zaszyfrowany.
 - Sekrety tylko w `pass` (odwołania w `.envrc`, ładowane przez direnv) i w sekretach Supabase. Nigdy w CI ani w plikach repozytorium.
+  Jedyny wyjątek (decyzja właściciela 2026-10-15): workflow `deploy-supabase.yml` dostaje `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` i `SUPABASE_DB_PASSWORD` jako zaszyfrowane sekrety środowiska GitHub `production` (niewidoczne po zapisaniu, maskowane w logach; tylko `workflow_dispatch` z `main`, wymagana akceptacja właściciela przy każdym uruchomieniu). Klucz secret / `service_role` i `OPENAI_API_KEY` nigdy nie trafiają do CI.
 - Adresy e-mail z listy dozwolonych wpisuje właściciel ręcznie w panelu Supabase (tabela `private.allowed_emails`, zob. README.md). Żaden skrypt ich nie czyta ani nie zapisuje. W testach tylko adresy `@example.com`.
 - Dostęp do danych punktów sprawdza `public.is_allowed()`: claim `email` z JWT + potwierdzony adres w `auth.users` dla `auth.uid()`. Nigdy `user_metadata`.
 - Każda nowa tabela: RLS włączone, jawny `GRANT` (Supabase nie wystawia nowych tabel automatycznie od 30.10.2026) i test negatywny pgTAP (`anon` i `authenticated` spoza listy nie widzą wierszy).
 - Brak polityk dla `anon` na danych punktów.
 - Nowe obiekty w `public` nie mają domyślnych uprawnień dla `anon`/`authenticated` (migracja RLS); każda migracja nadaje `GRANT` jawnie.
 - Logowanie tylko bez haseł: `is_allowed()` odrzuca sesje z `amr` innym niż `otp`/`magiclink`/`oauth`/`email/signup`.
-- Testy E2E z prawdziwymi danymi tylko ręcznie, na projekcie Supabase. CI używa tylko danych syntetycznych.
+- Testy E2E z prawdziwymi danymi tylko ręcznie, na projekcie Supabase (`npm run test:e2e`, `e2e/README.md`). CI używa tylko danych syntetycznych. Zrzuty ekranu i ślady Playwright są wyłączone; sesja `e2e/.auth/` i raporty są wykluczone z git.
 - Dane w zgłoszeniach, logach i opisach PR zamaskowane (bez adresów e-mail, bez treści opisów).
 
 ## Ochrona przed wyciekiem (dwie warstwy)

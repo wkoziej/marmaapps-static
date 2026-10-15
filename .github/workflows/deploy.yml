@@ -1,0 +1,83 @@
+name: Wdrożenie strony (GitHub Pages)
+
+# Build Vite → GitHub Pages. Konfiguracja: docs/supabase-setup.md, sekcja „GitHub”.
+# Publiczna konfiguracja z repository variables (Settings → Secrets and variables → Actions → Variables):
+#   BASE_PATH                      — "/marmaapps-static/" (tymczasowy adres) lub "/" (domena),
+#   VITE_SUPABASE_URL              — adres projektu Supabase,
+#   VITE_SUPABASE_PUBLISHABLE_KEY  — klucz publiczny (publishable); publiczny z założenia, dane chroni RLS,
+# Sekrety nie są tu potrzebne i nie mogą tu trafić (zob. CLAUDE.md).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Vite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Kontrola konfiguracji publicznej
+        env:
+          BASE_PATH: ${{ vars.BASE_PATH }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          missing=()
+          for name in BASE_PATH VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Brak repository variables: ${missing[*]} (docs/supabase-setup.md, sekcja „GitHub”)."
+            exit 1
+          fi
+          case "$VITE_SUPABASE_PUBLISHABLE_KEY" in
+            sb_secret_*)
+              echo "::error::VITE_SUPABASE_PUBLISHABLE_KEY zawiera klucz secret. Usuń go i zmień klucz w panelu Supabase."
+              exit 1 ;;
+          esac
+
+      - name: Model 3D (public/models/human.glb)
+        run: |
+          test -f public/models/human.glb || { echo "::error::Brak public/models/human.glb w repozytorium."; exit 1; }
+      - name: Build
+        env:
+          BASE_PATH: ${{ vars.BASE_PATH }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Publikacja na GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

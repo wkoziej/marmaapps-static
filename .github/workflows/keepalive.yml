@@ -1,0 +1,85 @@
+name: Keep-alive Supabase
+
+# Darmowy projekt Supabase jest wstrzymywany po 7 dniach bez aktywności. Ten workflow co około 3 dni
+# wysyła do projektu zapytanie, które NIE zwraca danych punktów: anonimowy odczyt tabeli
+# public.marma_points kluczem publicznym. Rola `anon` nie ma GRANT ani polityk RLS na danych punktów,
+# więc oczekiwana odpowiedź to 401/403 (brak uprawnień) albo pusta lista.
+# Odpowiedź z danymi kończy workflow błędem (to byłby wyciek: sprawdź RLS i GRANT).
+# Do potwierdzenia po wdrożeniu: czy takie zapytanie Supabase liczy jako aktywność
+# (docs/supabase-setup.md, sekcja „Keep-alive”). Jeśli nie — dodać funkcję `health` dla `anon`.
+#
+# Repository variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (te same co deploy.yml).
+# Na końcu workflow ponownie włącza sam siebie przez API GitHub. To NIE chroni przed wyłączeniem
+# harmonogramu po 60 dniach bez aktywności w publicznym repozytorium: wyłączony workflow się nie
+# uruchomi. Sygnał, ręczne uruchomienie i przypomnienie: docs/supabase-setup.md, sekcja „Keep-alive”.
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Zapytanie do projektu Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - name: Zapytanie anonimowe (bez danych punktów)
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Brak repository variables VITE_SUPABASE_URL lub VITE_SUPABASE_PUBLISHABLE_KEY."
+            exit 1
+          fi
+          body="$RUNNER_TEMP/keepalive-body"
+          curl_rc=0
+          status="$(curl -sS --proto '=https' --max-time 30 -o "$body" -w '%{http_code}' \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Accept: application/json" \
+            "${SUPABASE_URL%/}/rest/v1/marma_points?select=name&limit=1")" || curl_rc=$?
+          if [ "$curl_rc" -ne 0 ]; then
+            # Błąd sieci (DNS, połączenie, timeout): brak odpowiedzi HTTP.
+            echo "::error::Brak połączenia z projektem Supabase (curl, kod $curl_rc). Projekt może być wstrzymany lub usunięty (panel Supabase → Restore project) albo VITE_SUPABASE_URL jest błędny (DNS)."
+            exit 1
+          fi
+          echo "HTTP $status"
+          case "$status" in
+            401 | 403)
+              # Oczekiwane: brak uprawnień roli anon. Do logu tylko kod błędu PostgREST, bez treści.
+              code="$(jq -r '.code // "?"' "$body" 2>/dev/null || echo '?')"
+              echo "Odmowa dostępu dla anon (kod PostgREST: $code). Dane punktów niedostępne: OK." ;;
+            2??)
+              if [ "$(jq -c '.' "$body" 2>/dev/null)" = "[]" ]; then
+                echo "Pusta lista: OK."
+              else
+                echo "::error::Zapytanie anonimowe zwróciło dane (HTTP $status). Sprawdź RLS i GRANT na public.marma_points."
+                exit 1
+              fi ;;
+            *)
+              echo "::error::Nieoczekiwany kod HTTP $status. Projekt może być wstrzymany (panel Supabase → Restore project)."
+              exit 1 ;;
+          esac
+          rm -f "$body"
+
+  reenable:
+    name: Ponowne włączenie harmonogramu
+    needs: ping
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: PUT /actions/workflows/keepalive.yml/enable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/keepalive.yml/enable"
