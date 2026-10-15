@@ -24,6 +24,35 @@ description_value_re="${DESCRIPTION_KEY}[\"']?[[:space:]]*:[[:space:]]*[\"'][^\"
 violations=()
 add() { violations+=("$1: $2"); }
 
+# signature_hex <obiekt git> — pierwsze 12 bajtów jako hex (małe litery, bez spacji).
+# Czytane przez od, więc bajty NUL nie trafiają do zmiennej powłoki.
+signature_hex() {
+  head -c 12 < <(git cat-file -p "$1" 2>/dev/null) | od -An -v -tx1 | tr -d ' \n'
+}
+
+# is_binary_media <ścieżka małymi literami> <obiekt git> — 0, gdy rozszerzenie i sygnatura pasują.
+is_binary_media() {
+  local lf="$1" sig
+  case "$lf" in
+    *.glb | *.png | *.jpg | *.jpeg | *.gif | *.webp | *.avif | *.ico | *.woff | *.woff2 | *.ttf | *.otf) ;;
+    *) return 1 ;;
+  esac
+  sig="$(signature_hex "$2")"
+  case "$lf" in
+    *.png) [[ "$sig" == 89504e47* ]] ;;                                # \x89PNG
+    *.jpg | *.jpeg) [[ "$sig" == ffd8ff* ]] ;;                         # FF D8 FF
+    *.gif) [[ "$sig" == 47494638* ]] ;;                                # GIF8
+    *.webp) [[ "$sig" == 52494646* && "${sig:16:8}" == 57454250 ]] ;;  # RIFF....WEBP
+    *.glb) [[ "$sig" == 676c5446* ]] ;;                                # glTF
+    *.ico) [[ "$sig" == 00000100* ]] ;;                                # 00 00 01 00
+    *.woff) [[ "$sig" == 774f4646* ]] ;;                               # wOFF
+    *.woff2) [[ "$sig" == 774f4632* ]] ;;                              # wOF2
+    *.ttf) [[ "$sig" == 00010000* ]] ;;                                # 00 01 00 00
+    *.otf) [[ "$sig" == 4f54544f* ]] ;;                                # OTTO
+    *.avif) [[ "${sig:8:16}" == 6674797061766966 ]] ;;                 # ftypavif od bajtu 4
+  esac
+}
+
 # check_file <ścieżka> <obiekt git z zawartością, np. ":ścieżka" lub "sha:ścieżka"> [etykieta]
 check_file() {
   local f="$1" obj="$2" label="${3:-$1}" lf content size
@@ -39,13 +68,15 @@ check_file() {
   esac
 
   # Binarne pliki mediów (model 3D, obrazy, fonty): bez kontroli treści — dane modelu
-  # 3D to też długie tablice liczb. Tekstowy glTF (.gltf) jest sprawdzany normalnie.
-  case "$lf" in
-    *.glb | *.png | *.jpg | *.jpeg | *.gif | *.webp | *.avif | *.ico | *.woff | *.woff2 | *.ttf | *.otf)
-      return ;;
-  esac
+  # 3D to też długie tablice liczb. Wyjątek tylko wtedy, gdy rozszerzenie ORAZ sygnatura
+  # pliku (magic bytes) się zgadzają; inaczej (np. JSON przemianowany na .png) normalne
+  # kontrole treści. Tekstowy glTF (.gltf) jest sprawdzany normalnie.
+  if is_binary_media "$lf" "$obj"; then
+    return
+  fi
 
-  content="$(git show "$obj" 2>/dev/null || true)"
+  # Bajty NUL usunięte przed podstawieniem (bez ostrzeżeń bash); treść tekstowa bez zmian.
+  content="$(git cat-file -p "$obj" 2>/dev/null | tr -d '\000' || true)"
 
   case "$lf" in
     package-lock.json | */package-lock.json | deno.lock | */deno.lock) ;;

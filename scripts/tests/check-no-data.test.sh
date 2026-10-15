@@ -261,6 +261,66 @@ mkdir -p "$r/public/models" "$r/public/images"
 git -C "$r" add -A
 expect "model .glb i obraz .png" 0 --staged "$r"
 
+# --- Przypadki z przeglądu PR #8: wyjątek tylko przy zgodnej sygnaturze pliku ---
+
+# Edge case: prawdziwe sygnatury (magic bytes) wszystkich typów mediów → bez kontroli treści.
+media_with_signature() { # <plik> <sygnatura dla printf>
+  { printf "$2"; long_vector; } >"$1"
+}
+r="$(new_repo)"
+mkdir -p "$r/m"
+media_with_signature "$r/m/a.jpg" '\xff\xd8\xff\xe0'
+media_with_signature "$r/m/a.jpeg" '\xff\xd8\xff\xdb'
+media_with_signature "$r/m/a.gif" 'GIF89a'
+media_with_signature "$r/m/a.webp" 'RIFF\x10\x00\x00\x00WEBP'
+media_with_signature "$r/m/a.avif" '\x00\x00\x00\x1cftypavif'
+media_with_signature "$r/m/a.ico" '\x00\x00\x01\x00'
+media_with_signature "$r/m/a.woff" 'wOFF'
+media_with_signature "$r/m/a.woff2" 'wOF2'
+media_with_signature "$r/m/a.ttf" '\x00\x01\x00\x00'
+media_with_signature "$r/m/a.otf" 'OTTO'
+media_with_signature "$r/m/A.PNG" '\x89PNG\r\n\x1a\n'
+git -C "$r" add -A
+expect "media z poprawnymi sygnaturami" 0 --staged "$r"
+
+# Error path: JSON z długim wektorem przemianowany na .png → normalne kontrole treści.
+r="$(new_repo)"
+echo "{\"vector\": $(long_vector)}" >"$r/vectors.png"
+git -C "$r" add -A
+expect "JSON przemianowany na .png" 1 --staged "$r" "vectors.png"
+
+# Error path: sygnatura innego typu niż rozszerzenie (PNG zapisany jako .glb).
+r="$(new_repo)"
+media_with_signature "$r/model.glb" '\x89PNG\r\n\x1a\n'
+git -C "$r" add -A
+expect "sygnatura PNG w pliku .glb" 1 --staged "$r" "model.glb"
+
+# Error path: pole opisu w pliku .jpg bez sygnatury JPEG.
+r="$(new_repo)"
+echo "{\"treatment_in_polish\": \"$long_text\"}" >"$r/photo.jpg"
+git -C "$r" add -A
+expect "opis w .jpg bez sygnatury" 1 --staged "$r" "photo.jpg"
+
+# Error path: plik .webp z RIFF, ale bez WEBP na pozycji 8.
+r="$(new_repo)"
+media_with_signature "$r/a.webp" 'RIFF\x10\x00\x00\x00WAVE'
+git -C "$r" add -A
+expect "RIFF bez WEBP" 1 --staged "$r" "a.webp"
+
+# Edge case: brak ostrzeżeń o bajtach NUL (sygnatura i treść z bajtami 0x00).
+r="$(new_repo)"
+media_with_signature "$r/a.ico" '\x00\x00\x01\x00'
+media_with_signature "$r/b.ttf" '\x00\x00\x00\x00'
+git -C "$r" add -A
+out="$(cd "$r" && "$GUARD" --staged 2>&1)"
+if grep -qi "null byte" <<<"$out"; then
+  echo "FAIL: ostrzeżenie o bajtach NUL"; echo "$out"; FAIL=$((FAIL + 1))
+elif ! grep -qF "b.ttf" <<<"$out" || grep -qF "a.ico" <<<"$out"; then
+  echo "FAIL: oczekiwano blokady tylko b.ttf"; echo "$out"; FAIL=$((FAIL + 1))
+else
+  echo "ok: brak ostrzeżeń o bajtach NUL"; PASS=$((PASS + 1))
+fi
+
 # Error path: tekstowy glTF (.gltf) nadal jest sprawdzany.
 r="$(new_repo)"
 echo "{\"accessors\":[{\"max\":$(long_vector)}]}" >"$r/model.gltf"
