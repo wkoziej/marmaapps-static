@@ -25,7 +25,9 @@ npm test             # Vitest
 npm run test:guard   # strażnik danych
 npm run check:data   # strażnik danych na wszystkich plikach
 npx supabase start   # lokalny stack (Docker)
-npx supabase test db # pgTAP: schemat, lista adresów, RLS
+npx supabase test db # pgTAP: schemat, lista adresów, RLS, limit zapytań
+npm run test:functions  # Deno: funkcja Edge search (fałszywe klienty, bez OpenAI)
+npm run check:functions # Deno: kontrola typów index.ts
 ```
 
 ## Dodanie użytkownika do listy dozwolonych adresów
@@ -52,3 +54,31 @@ Lokalnie ustawia je `supabase/config.toml`. W projekcie w chmurze trzeba je usta
 Ochrona danych nie zależy od samego hooka. `public.is_allowed()` wymaga: potwierdzonego adresu z listy, adresu z JWT zgodnego z kontem i sesji bez hasła (claim `amr`: `otp`, `magiclink` lub `oauth`). Sesja z logowania hasłem nie widzi danych, nawet jeśli ktoś założył konto z hasłem na adres z listy.
 
 Test dymny po każdej zmianie ustawień Auth: prośba o link dla adresu spoza listy (np. `nikt@example.com`) zwraca 403.
+
+## Funkcja Edge `search`
+
+Kontrakt (zgodny z dawnym `/pointsdb/answer`): `GET /functions/v1/search?problem=<fraza>`,
+nagłówki `Authorization: Bearer <access_token sesji>` i `apikey: <klucz publiczny>`.
+Odpowiedź 200: `{"answer": {"points": [...]}}`. Błędy: `{"error": "<komunikat>"}` z kodem
+400 (brak lub za długa fraza, maks. 200 znaków), 401 (brak sesji lub klucz publiczny zamiast sesji),
+403 (adres spoza listy), 405, 429 (limit zapytań), 500 (błąd bazy), 502 (błąd OpenAI).
+
+Limit zapytań na użytkownika: 30 na minutę i 500 na dobę (UTC); wartości w funkcji
+`public.consume_search_quota()` (migracja `*_search_quota.sql`).
+
+Sekrety funkcji (panel Supabase → Edge Functions → Secrets lub `npx supabase secrets set`; nigdy w repozytorium):
+
+- `OPENAI_API_KEY` — klucz projektu OpenAI do embeddingów (`text-embedding-3-small`). Używany tylko wtedy,
+  gdy wyszukiwanie po nazwie i doszy nic nie zwróci.
+- `ALLOWED_ORIGINS` — dozwolone originy strony po przecinku (domena produkcyjna, tymczasowy adres
+  GitHub Pages do czasu przełączenia, adres lokalny Vite).
+
+`SUPABASE_URL` i `SUPABASE_ANON_KEY` dostarcza runtime. Funkcja nie używa klucza secret/`service_role`:
+zapytania idą z JWT użytkownika, więc działa RLS.
+
+W panelu OpenAI ustaw miesięczny limit wydatków (Usage limits) dla projektu klucza.
+
+Lokalnie: `supabase/functions/.env` (wykluczony z git) z `ALLOWED_ORIGINS=http://localhost:5173`, potem
+`npx supabase functions serve --env-file supabase/functions/.env`. Bez `OPENAI_API_KEY` ścieżka
+semantyczna zwraca 502. Uwaga: lokalna brama (Kong) sama obsługuje `OPTIONS` i nadpisuje
+`Access-Control-Allow-Origin` na `*`, więc ograniczenie originów da się sprawdzić tylko na projekcie w chmurze.

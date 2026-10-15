@@ -53,7 +53,7 @@ Nie używaj `git commit --no-verify` ani `SKIP_SIMPLE_GIT_HOOKS=1`, aby obejść
 - `npm test` — Vitest (frontend).
 - `npm run test:guard` — testy strażnika danych.
 - `npx supabase test db` — pgTAP (wymaga lokalnego stacku: `npx supabase start`, Docker).
-- `npx deno test` w `supabase/functions/` — testy funkcji Edge.
+- `npm run test:functions` — testy funkcji Edge (Deno, fałszywe klienty bazy i OpenAI).
 
 Implementacja metodą TDD: test przed kodem.
 
