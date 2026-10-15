@@ -4,7 +4,7 @@
 // Zasada danych (CLAUDE.md): tutaj są tylko zapytania i oczekiwane NAZWY punktów.
 // Żadnych fragmentów opisów (działań, wskazań, leczenia). Test nie wypisuje treści opisów.
 // Porównanie: zbiór nazw z wyników zawiera oczekiwane nazwy; kolejność nie ma znaczenia.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 // Selektory strony points.html i SearchView (U6).
 const SEARCH_INPUT = '[data-testid="search-input"]';

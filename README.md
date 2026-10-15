@@ -165,6 +165,7 @@ npx supabase functions deploy search
 ```bash
 npx playwright install chromium
 E2E_BASE_URL=https://wkoziej.github.io/marmaapps-static/ E2E_STORAGE_STATE=e2e/.auth/session.json npm run test:e2e
+rm -rf test-results playwright-report e2e/.auth   # raporty mogą zawierać fragmenty strony
 ```
 
 Tylko na projekcie Supabase z prawdziwymi danymi, nigdy w CI. Szczegóły i zapis sesji: `e2e/README.md`.

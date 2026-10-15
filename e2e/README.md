@@ -6,6 +6,9 @@
 - uruchamiasz go **ręcznie**, na projekcie Supabase (nigdy w CI);
 - repozytorium zawiera tylko zapytania i oczekiwane **nazwy** punktów, bez fragmentów opisów;
 - zrzuty ekranu, nagrania i ślady są wyłączone (`playwright.config.js`), bo zawierałyby opisy;
+- zrzut ARIA strony w `test-results/*/error-context.md` jest wyłączony (`PLAYWRIGHT_NO_COPY_PROMPT`
+  w `playwright.config.js` i fixture `e2e/fixtures.js`); plik nadal zawiera komunikat błędu, więc
+  po każdym uruchomieniu usuń raporty (niżej);
 - katalogi `e2e/.auth/`, `test-results/`, `playwright-report/` są wykluczone z git.
 
 Wyniki porównujemy jako zbiory nazw (wyniki **zawierają** oczekiwane nazwy), bez kolejności.
@@ -28,7 +31,6 @@ tylko w `pass` / env (`E2E_EMAIL`), nigdy w pliku repozytorium.
 | `E2E_STORAGE_STATE` | Ścieżka do zapisanej sesji (wariant A). |
 | `E2E_EMAIL` | Adres konta testowego (wariant B). |
 | `E2E_MAILPIT_URL` | Adres Mailpit, np. `http://127.0.0.1:54324` (wariant B). |
-| `E2E_SUPABASE_URL`, `E2E_SUPABASE_PUBLISHABLE_KEY` | Projekt Supabase, do którego wysyłana jest prośba o link (wariant B). |
 
 ## Wariant A: zapisana sesja (projekt w chmurze, e-mail przez Resend)
 
@@ -45,6 +47,7 @@ npx playwright open --save-storage=e2e/.auth/session.json "$E2E_BASE_URL"
 
 ```bash
 E2E_STORAGE_STATE=e2e/.auth/session.json npm run test:e2e
+rm -rf test-results playwright-report
 ```
 
 Plik sesji zawiera tokeny: nie kopiuj go nigdzie i usuń po teście (`rm -rf e2e/.auth`).
@@ -54,22 +57,25 @@ Przed kolejnym uruchomieniem zapisz sesję ponownie.
 ## Wariant B: Mailpit (lokalny stack Supabase)
 
 Lokalny stack przechwytuje e-maile w Mailpit (`npx supabase status` pokazuje adres).
-`e2e/global-setup.js` wysyła prośbę o link przez API Auth, odczytuje link z Mailpit, otwiera go
-w przeglądarce i zapisuje sesję do `e2e/.auth/session.json`.
+Logowanie używa PKCE (U7): weryfikator kodu jest w `localStorage` przeglądarki, która poprosiła
+o link. Dlatego `e2e/global-setup.js` wysyła prośbę przez formularz `login.html` w przeglądarce
+Playwright, odczytuje link z Mailpit, otwiera go **w tym samym kontekście** przeglądarki i zapisuje
+sesję do `e2e/.auth/session.json`.
+
+Strona musi używać lokalnego projektu: `.env.local` (wykluczony z git) z `VITE_SUPABASE_URL` i
+`VITE_SUPABASE_PUBLISHABLE_KEY` z `npx supabase status -o env`, potem `npx vite`. Funkcja `search`:
+`npx supabase functions serve` (zob. README.md). Konto testowe: adres `@example.com` dodany do
+`private.allowed_emails` w lokalnej bazie.
 
 ```bash
 E2E_BASE_URL=http://localhost:5173/ \
-E2E_EMAIL=... E2E_MAILPIT_URL=http://127.0.0.1:54324 \
-E2E_SUPABASE_URL=http://127.0.0.1:54321 E2E_SUPABASE_PUBLISHABLE_KEY=... \
+E2E_EMAIL=...@example.com E2E_MAILPIT_URL=http://127.0.0.1:54324 \
 npm run test:e2e
+rm -rf test-results playwright-report e2e/.auth
 ```
 
-Wariant B ma sens tylko wtedy, gdy lokalna baza zawiera zaimportowane dane (U5). Adres
-`E2E_BASE_URL` musi być w `additional_redirect_urls` lokalnego `supabase/config.toml`.
-
-Do sprawdzenia po scaleniu U7: czy strona logowania przyjmuje powrót z linku wysłanego przez API
-(bez PKCE, tokeny w części `#` adresu). Jeżeli U7 używa wyłącznie przepływu PKCE, wariant B wymaga
-zmiany (np. prośba o link przez formularz logowania).
+Test regresji ma sens tylko wtedy, gdy lokalna baza zawiera zaimportowane dane (U5). Adres
+`E2E_BASE_URL` musi pasować do `additional_redirect_urls` lokalnego `supabase/config.toml`.
 
 ## Lista testów bez uruchamiania przeglądarki
 
