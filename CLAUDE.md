@@ -8,7 +8,7 @@ Następca prywatnego repozytorium `marmaapps` (Django na DigitalOcean).
 ## Bezpieczeństwo danych
 
 Zakazane w repozytorium:
-- dane punktów: opisy (dokumenty z RethinkDB), wektory embeddingów, eksporty tabel, zrzuty baz (`*.sqlite3`, `*.snapshot`, `*.dump`, `*.tar.gz`);
+- dane punktów: opisy (dokumenty z RethinkDB), wektory embeddingów, eksporty tabel, zrzuty baz i archiwa (`*.sqlite3`, `*.snapshot`, `*.dump`, `*.gz`, `*.zip`, `*.parquet`, `*.npy`, `*.pkl` i inne — pełna lista w `scripts/check-no-data.sh`);
 - dane osobowe: adresy e-mail użytkowników, dane kont i płatności;
 - sekrety: klucz secret / `service_role` Supabase, hasło bazy (connection string), `OPENAI_API_KEY`, tokeny dostępu.
 
@@ -29,7 +29,7 @@ Zasady:
 ## Ochrona przed wyciekiem (dwie warstwy)
 
 1. Hook pre-commit (`scripts/pre-commit.sh`, instalowany przez `npm install`): strażnik danych `scripts/check-no-data.sh --staged` i `gitleaks`.
-2. CI (`.github/workflows/ci.yml`): `scripts/check-no-data.sh --all` i `gitleaks` na całej historii.
+2. CI (`.github/workflows/ci.yml`): strażnik na wszystkich plikach i na każdym commicie PR/pusha (`--range`), `gitleaks` na całej historii. CI wykrywa wyciek dopiero po pushu — dane są wtedy już publiczne na gałęzi, więc obowiązuje procedura po alarmie.
 
 Dodatkowo w ustawieniach repozytorium: GitHub secret scanning i push protection.
 

@@ -149,6 +149,119 @@ git -C "$r" add -A
 git -C "$r" commit -q -m bad --no-verify
 expect "--all znajduje .sqlite3" 1 --all "$r" "db.sqlite3"
 
+# --- Przypadki z przeglądu PR #1 ---
+
+pretty_vector() {
+  local i
+  echo '['
+  for i in $(seq 1 99); do echo "  0.0$i,"; done
+  echo '  0.5'
+  echo ']'
+}
+
+# Error path: wektor zapisany w wielu liniach (json.dump indent=2).
+r="$(new_repo)"
+{ echo '{"vector":'; pretty_vector; echo '}'; } >"$r/vec.json"
+git -C "$r" add -A
+expect "wektor w wielu liniach" 1 --staged "$r" "vec.json"
+
+# Granica: dokładnie 50 liczb → blokada, 49 → dozwolone.
+r="$(new_repo)"
+echo "[$(seq -s ', ' 1 50 | sed 's/\([0-9]\+\)/0.\1/g')]" >"$r/v50.txt"
+git -C "$r" add -A
+expect "50 liczb" 1 --staged "$r" "v50.txt"
+r="$(new_repo)"
+echo "[$(seq -s ', ' 1 49 | sed 's/\([0-9]\+\)/0.\1/g')]" >"$r/v49.txt"
+git -C "$r" add -A
+expect "49 liczb" 0 --staged "$r"
+
+# Error path: opis punktu w seed SQL (jsonb z długą wartością).
+long_text="To jest długi opis punktu, który wygląda jak prawdziwa treść z bazy danych."
+r="$(new_repo)"
+mkdir -p "$r/supabase"
+echo "insert into points (doc) values ('{\"treatment_in_polish\": \"$long_text\"}');" >"$r/supabase/seed.sql"
+git -C "$r" add -A
+expect "opis w seed.sql" 1 --staged "$r" "supabase/seed.sql"
+
+# Error path: opis punktu w fixture JS poza __fixtures__/synthetic/.
+r="$(new_repo)"
+echo "export const doc = { indications_in_polish: '$long_text' };" >"$r/fix.test.js"
+git -C "$r" add -A
+expect "opis w fixture .js" 1 --staged "$r" "fix.test.js"
+
+# Edge case: krótka syntetyczna wartość w teście SQL jest dozwolona.
+r="$(new_repo)"
+mkdir -p "$r/supabase/tests"
+echo "select '{\"location_in_polish\": \"Głowa\"}'::jsonb;" >"$r/supabase/tests/rls.test.sql"
+git -C "$r" add -A
+expect "krótka wartość w teście SQL" 0 --staged "$r"
+
+# Edge case: długi opis w fixture JS wewnątrz __fixtures__/synthetic/ jest dozwolony.
+r="$(new_repo)"
+mkdir -p "$r/__fixtures__/synthetic"
+echo "export const doc = { treatment_in_polish: '$long_text' };" >"$r/__fixtures__/synthetic/doc.js"
+git -C "$r" add -A
+expect "synthetic w katalogu głównym" 0 --staged "$r"
+
+# Error path: pola opisu w .csv i .jsonl.
+for f in points.csv points.jsonl; do
+  r="$(new_repo)"
+  echo 'name,commentary_in_polish' >"$r/$f"
+  git -C "$r" add -A
+  expect "pole opisu w $f" 1 --staged "$r" "$f"
+done
+
+# Error path: wielkie litery w rozszerzeniach.
+r="$(new_repo)"
+echo x >"$r/DB.SQLITE3"
+git -C "$r" add -A
+expect "rozszerzenie .SQLITE3" 1 --staged "$r" "DB.SQLITE3"
+r="$(new_repo)"
+echo '{"treatment_in_polish": "x"}' >"$r/D.JSON"
+git -C "$r" add -A
+expect "rozszerzenie .JSON" 1 --staged "$r" "D.JSON"
+
+# Error path: inne formaty archiwów i danych.
+for f in dump.sql.gz export.zip points.parquet vec.npy data.pkl db.bak; do
+  r="$(new_repo)"
+  echo x >"$r/$f"
+  git -C "$r" add -A
+  expect "plik $f" 1 --staged "$r" "$f"
+done
+
+# Error path: --range znajduje plik dodany i usunięty w zakresie commitów.
+r="$(new_repo)"
+echo a >"$r/a.txt"
+git -C "$r" add -A
+git -C "$r" commit -q -m base
+base="$(git -C "$r" rev-parse HEAD)"
+echo x >"$r/leak.sqlite3"
+git -C "$r" add -A
+git -C "$r" commit -q -m leak --no-verify
+git -C "$r" rm -q leak.sqlite3
+git -C "$r" commit -q -m remove --no-verify
+out="$(cd "$r" && "$GUARD" --range "$base..HEAD" 2>&1)"; code=$?
+if [ "$code" -ne 0 ] && grep -qF "leak.sqlite3" <<<"$out"; then
+  echo "ok: --range znajduje plik usunięty później"; PASS=$((PASS + 1))
+else
+  echo "FAIL: --range nie znalazł leak.sqlite3 (kod $code)"; echo "$out"; FAIL=$((FAIL + 1))
+fi
+out="$(cd "$r" && "$GUARD" --range "HEAD~1..HEAD" 2>&1)"; code=$?
+if [ "$code" -eq 0 ]; then
+  echo "ok: --range bez wycieku w zakresie"; PASS=$((PASS + 1))
+else
+  echo "FAIL: --range HEAD~1..HEAD (kod $code)"; echo "$out"; FAIL=$((FAIL + 1))
+fi
+
+# Error path: nieznany tryb.
+r="$(new_repo)"
+(cd "$r" && "$GUARD" --bad >/dev/null 2>&1); code=$?
+if [ "$code" -eq 2 ]; then
+  echo "ok: nieznany tryb → kod 2"; PASS=$((PASS + 1))
+else
+  echo "FAIL: nieznany tryb (kod $code)"; FAIL=$((FAIL + 1))
+fi
+
 # Error path: gitleaks blokuje ciąg wyglądający jak klucz API.
 if command -v gitleaks >/dev/null; then
   r="$(new_repo)"

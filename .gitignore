@@ -8,6 +8,13 @@ data-export/
 *.sqlite
 *.snapshot
 *.dump
+*.bak
+*.gz
+*.zip
+*.parquet
+*.npy
+*.npz
+*.pkl
 
 # Sekrety i lokalna konfiguracja
 .env
