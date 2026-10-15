@@ -84,7 +84,7 @@ as $$
            1 - (e.embedding operator(extensions.<=>) query_embedding) as similarity
     from public.subject_embeddings e
     where 1 - (e.embedding operator(extensions.<=>) query_embedding) >= 0.65
-    order by e.embedding operator(extensions.<=>) query_embedding
+    order by e.embedding operator(extensions.<=>) query_embedding, e.subject_id, e.is_polish
     limit 5
   ),
   ranked as (

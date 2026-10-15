@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(45);
+select plan(48);
 
 -- Pomocnicza funkcja testowa (tylko w tej sesji).
 create function pg_temp.sim_vec(s double precision)
@@ -138,6 +138,10 @@ select results_eq(
   $$ values ('Punkt A'::text), ('Punkt B'), ('Punkt C'), ('Punkt D'), ('Punkt E') $$,
   'nazwa: kolejność według identyfikatora punktu');
 
+select is_empty(
+  $$ select name from public.search_points_by_name('\\') $$,
+  'nazwa: ukośnik wsteczny jest dosłowny (brak błędu escape, brak trafień)');
+
 -- ---------------------------------------------------------------------------
 -- Wyszukiwanie po doszy.
 -- ---------------------------------------------------------------------------
@@ -187,6 +191,33 @@ select results_eq(
 select throws_ok(
   $$ select name from public.match_points_by_embedding('[1,0,0]'::extensions.vector) $$,
   '22000', null, 'wektory: zły wymiar wektora zapytania → błąd');
+reset role;
+
+-- 0.75 / 0.71 / 0.68 (wszystkie < 0.8) → reguła „pierwszy − 0.05” sama: 0.71 przyjęty, 0.68 odrzucony.
+delete from public.subject_embeddings;
+insert into public.subject_embeddings (subject_id, is_polish, embedding) values
+  (1, false, pg_temp.sim_vec(0.75)),
+  (2, false, pg_temp.sim_vec(0.71)),
+  (3, false, pg_temp.sim_vec(0.68));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
+select results_eq(
+  $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
+  $$ values ('Punkt A'::text), ('Punkt B') $$,
+  'wektory: 0.75 / 0.71 / 0.68 → reguła pierwszy − 0.05 bez progu 0.8');
+reset role;
+
+-- Kolejność według similarity, a nie według id: temat 2 (Punkt B) 0.95, temat 1 (Punkt A) 0.9.
+delete from public.subject_embeddings;
+insert into public.subject_embeddings (subject_id, is_polish, embedding) values
+  (1, false, pg_temp.sim_vec(0.9)),
+  (2, false, pg_temp.sim_vec(0.95));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated","amr":[{"method":"otp"}],"email":"allowed@example.com","is_anonymous":false}';
+select results_eq(
+  $$ select name from public.match_points_by_embedding(current_setting('test.q')::extensions.vector) $$,
+  $$ values ('Punkt B'::text), ('Punkt A') $$,
+  'wektory: kolejność według similarity (B 0.95 przed A 0.9)');
 reset role;
 
 -- Wszystkie similarity < 0.65 → brak wyników.
