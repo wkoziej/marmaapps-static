@@ -5,7 +5,6 @@ name: Wdrożenie strony (GitHub Pages)
 #   BASE_PATH                      — "/marmaapps-static/" (tymczasowy adres) lub "/" (domena),
 #   VITE_SUPABASE_URL              — adres projektu Supabase,
 #   VITE_SUPABASE_PUBLISHABLE_KEY  — klucz publiczny (publishable); publiczny z założenia, dane chroni RLS,
-#   HUMAN_MODEL_URL, HUMAN_MODEL_SHA256 — źródło modelu 3D (public/models/human.glb nie jest w repozytorium).
 # Sekrety nie są tu potrzebne i nie mogą tu trafić (zob. CLAUDE.md).
 
 on:
@@ -53,27 +52,8 @@ jobs:
           esac
 
       - name: Model 3D (public/models/human.glb)
-        env:
-          HUMAN_MODEL_URL: ${{ vars.HUMAN_MODEL_URL }}
-          HUMAN_MODEL_SHA256: ${{ vars.HUMAN_MODEL_SHA256 }}
         run: |
-          model=public/models/human.glb
-          if [ -f "$model" ]; then
-            echo "Model jest w drzewie roboczym: $model"
-            exit 0
-          fi
-          if [ -z "$HUMAN_MODEL_URL" ]; then
-            echo "::error::Brak $model i brak zmiennej HUMAN_MODEL_URL. Model nie jest w repozytorium (licencja niepotwierdzona). Ustaw HUMAN_MODEL_URL i HUMAN_MODEL_SHA256 (docs/supabase-setup.md)."
-            exit 1
-          fi
-          if ! [[ "$HUMAN_MODEL_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "::error::HUMAN_MODEL_SHA256 musi zawierać sumę SHA-256 (64 znaki hex, małe litery)."
-            exit 1
-          fi
-          mkdir -p "$(dirname "$model")"
-          curl -sSfL --proto '=https' --max-time 300 -o "$model" "$HUMAN_MODEL_URL"
-          echo "$HUMAN_MODEL_SHA256  $model" | sha256sum -c -
-
+          test -f public/models/human.glb || { echo "::error::Brak public/models/human.glb w repozytorium."; exit 1; }
       - name: Build
         env:
           BASE_PATH: ${{ vars.BASE_PATH }}

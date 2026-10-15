@@ -21,9 +21,7 @@ npm run dev
 
 ### Model 3D (`public/models/human.glb`)
 
-Model nie jest w repozytorium: licencja nie jest jeszcze potwierdzona przez właściciela, a ścieżka jest w `.gitignore`.
-Skopiuj plik ręcznie z prywatnego repozytorium `marmaapps` (`djangoapp/static/mpoints/assets/human.glb`) do `public/models/human.glb`.
-Bez pliku strona punktów działa, ale model się nie wczytuje (błąd w konsoli). `npm run build` kopiuje plik do `dist/models/`.
+Model jest w repozytorium (właściciel potwierdził prawo do publicznego udostępnienia). `npm run build` kopiuje plik do `dist/models/`.
 
 ## Frontend
 
@@ -146,9 +144,7 @@ Pełna lista ustawień usług i test dymny: `docs/supabase-setup.md`.
 | `.github/workflows/keepalive.yml` | co ok. 3 dni, ręcznie | zapytanie bez danych punktów do projektu Supabase; ponowne włączenie harmonogramu |
 
 Strona: konfiguracja publiczna z repository variables (`BASE_PATH`, `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_PUBLISHABLE_KEY`). Model 3D `public/models/human.glb` nie jest w repozytorium:
-workflow pobiera go z `HUMAN_MODEL_URL` i sprawdza sumę `HUMAN_MODEL_SHA256`. Lokalnie skopiuj plik
-do `public/models/` (plik wykluczony z git).
+`VITE_SUPABASE_PUBLISHABLE_KEY`). Model 3D `public/models/human.glb` jest w repozytorium.
 
 Supabase: sekrety `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` są tylko
 sekretami środowiska `production` (wymagana akceptacja właściciela). Sekrety funkcji

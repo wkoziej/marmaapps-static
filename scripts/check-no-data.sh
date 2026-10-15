@@ -38,6 +38,13 @@ check_file() {
       add "$label" "zrzut bazy, archiwum lub binarny plik danych"; return ;;
   esac
 
+  # Binarne pliki mediów (model 3D, obrazy, fonty): bez kontroli treści — dane modelu
+  # 3D to też długie tablice liczb. Tekstowy glTF (.gltf) jest sprawdzany normalnie.
+  case "$lf" in
+    *.glb | *.png | *.jpg | *.jpeg | *.gif | *.webp | *.avif | *.ico | *.woff | *.woff2 | *.ttf | *.otf)
+      return ;;
+  esac
+
   content="$(git show "$obj" 2>/dev/null || true)"
 
   case "$lf" in

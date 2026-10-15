@@ -125,12 +125,7 @@ npx supabase secrets list --project-ref "$SUPABASE_PROJECT_REF"   # pokazuje tyl
   | `BASE_PATH` | `/marmaapps-static/` (po przełączeniu domeny: `/`) |
   | `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
   | `VITE_SUPABASE_PUBLISHABLE_KEY` | klucz publishable (publiczny z założenia) |
-  | `HUMAN_MODEL_URL` | adres HTTPS pliku `human.glb` (poza repozytorium) |
-  | `HUMAN_MODEL_SHA256` | suma `sha256sum human.glb` (64 znaki hex) |
 
-  Model 3D nie jest w repozytorium (licencja niepotwierdzona). Uwaga: strona na GitHub Pages udostępnia
-  plik modelu publicznie, tak samo jak repozytorium. **Przed pierwszym wdrożeniem potwierdź licencję
-  modelu** (prawo do publicznego udostępnienia). Bez `HUMAN_MODEL_URL` workflow „Wdrożenie strony” kończy się błędem.
 - [ ] Settings → Environments → **`production`**:
   - Required reviewers: właściciel. Jeżeli jesteś jedynym recenzentem, nie włączaj „Prevent self-review”
     (inaczej nikt nie zatwierdzi wdrożenia).

@@ -253,6 +253,20 @@ else
   echo "FAIL: --range HEAD~1..HEAD (kod $code)"; echo "$out"; FAIL=$((FAIL + 1))
 fi
 
+# Edge case: binarne pliki mediów (model 3D, obrazy) nie są sprawdzane pod kątem treści.
+r="$(new_repo)"
+mkdir -p "$r/public/models" "$r/public/images"
+{ printf 'glTF'; echo "{\"accessors\":[{\"max\":$(long_vector)}]}"; } >"$r/public/models/human.glb"
+{ printf '\x89PNG\r\n'; long_vector; } >"$r/public/images/a.png"
+git -C "$r" add -A
+expect "model .glb i obraz .png" 0 --staged "$r"
+
+# Error path: tekstowy glTF (.gltf) nadal jest sprawdzany.
+r="$(new_repo)"
+echo "{\"accessors\":[{\"max\":$(long_vector)}]}" >"$r/model.gltf"
+git -C "$r" add -A
+expect "model .gltf z długą tablicą" 1 --staged "$r" "model.gltf"
+
 # Error path: nieznany tryb.
 r="$(new_repo)"
 (cd "$r" && "$GUARD" --bad >/dev/null 2>&1); code=$?
