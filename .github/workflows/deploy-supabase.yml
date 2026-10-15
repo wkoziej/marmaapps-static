@@ -27,10 +27,9 @@ jobs:
     name: db push + functions deploy
     runs-on: ubuntu-latest
     environment: production
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    timeout-minutes: 20
+    # Sekrety tylko w `env` kroków, które ich potrzebują. `npm ci` (skrypty instalacyjne
+    # zależności) działa bez sekretów w środowisku.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +42,10 @@ jobs:
       - run: npm ci
 
       - name: Kontrola sekretów
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           missing=()
           for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
@@ -54,13 +57,26 @@ jobs:
           fi
 
       - name: supabase link
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Migracje do zastosowania (dry run)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: npx supabase db push --linked --dry-run --skip-vault
 
       - name: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: npx supabase db push --linked --skip-vault
 
       - name: supabase functions deploy search
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: npx supabase functions deploy search --project-ref "$SUPABASE_PROJECT_REF" --use-api

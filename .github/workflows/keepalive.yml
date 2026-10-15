@@ -9,16 +9,16 @@ name: Keep-alive Supabase
 # (docs/supabase-setup.md, sekcja „Keep-alive”). Jeśli nie — dodać funkcję `health` dla `anon`.
 #
 # Repository variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (te same co deploy.yml).
-# Na końcu workflow ponownie włącza sam siebie przez API GitHub: GitHub wyłącza harmonogram
-# po 60 dniach bez aktywności w publicznym repozytorium.
+# Na końcu workflow ponownie włącza sam siebie przez API GitHub. To NIE chroni przed wyłączeniem
+# harmonogramu po 60 dniach bez aktywności w publicznym repozytorium: wyłączony workflow się nie
+# uruchomi. Sygnał, ręczne uruchomienie i przypomnienie: docs/supabase-setup.md, sekcja „Keep-alive”.
 
 on:
   schedule:
     - cron: "17 6 */3 * *"
   workflow_dispatch:
 
-permissions:
-  actions: write
+permissions: {}
 
 concurrency:
   group: keepalive
@@ -29,6 +29,7 @@ jobs:
     name: Zapytanie do projektu Supabase
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions: {}
     env:
       SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -40,10 +41,16 @@ jobs:
             exit 1
           fi
           body="$RUNNER_TEMP/keepalive-body"
+          curl_rc=0
           status="$(curl -sS --proto '=https' --max-time 30 -o "$body" -w '%{http_code}' \
             -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
             -H "Accept: application/json" \
-            "${SUPABASE_URL%/}/rest/v1/marma_points?select=name&limit=1")"
+            "${SUPABASE_URL%/}/rest/v1/marma_points?select=name&limit=1")" || curl_rc=$?
+          if [ "$curl_rc" -ne 0 ]; then
+            # Błąd sieci (DNS, połączenie, timeout): brak odpowiedzi HTTP.
+            echo "::error::Brak połączenia z projektem Supabase (curl, kod $curl_rc). Projekt może być wstrzymany lub usunięty (panel Supabase → Restore project) albo VITE_SUPABASE_URL jest błędny (DNS)."
+            exit 1
+          fi
           echo "HTTP $status"
           case "$status" in
             401 | 403)
@@ -69,6 +76,8 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: write
     steps:
       - name: PUT /actions/workflows/keepalive.yml/enable
         env:

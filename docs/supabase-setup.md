@@ -147,16 +147,29 @@ npx supabase secrets list --project-ref "$SUPABASE_PROJECT_REF"   # pokazuje tyl
 Darmowy projekt jest wstrzymywany po 7 dniach bez aktywności. Workflow co około 3 dni wysyła anonimowe
 zapytanie `GET /rest/v1/marma_points?select=name&limit=1` z kluczem publicznym. Rola `anon` nie ma
 uprawnień do danych punktów, więc oczekiwana odpowiedź to 401 (lub pusta lista). Odpowiedź z danymi
-kończy workflow błędem (wyciek: sprawdź RLS i GRANT). Na końcu workflow ponownie włącza swój harmonogram
-przez API GitHub (`PUT /repos/{repo}/actions/workflows/keepalive.yml/enable`).
+kończy workflow błędem (wyciek: sprawdź RLS i GRANT). Błąd sieci (brak odpowiedzi HTTP, np. DNS
+lub projekt wstrzymany/usunięty) kończy workflow czytelnym komunikatem `Brak połączenia z projektem Supabase`.
 
 - [ ] Actions → „Keep-alive Supabase” → Run workflow. Oczekiwany log: `HTTP 401` (lub pusta lista), oba joby zielone.
-- [ ] **[do sprawdzenia]** czy Supabase liczy odrzucone zapytanie anonimowe jako aktywność projektu.
+- [ ] **[do sprawdzenia]** czy Supabase liczy odrzucone zapytanie anonimowe (401/403) jako aktywność projektu.
   Sprawdź po ok. 8 dniach bez innego ruchu (brak e-maila o wstrzymaniu, projekt aktywny).
   Jeżeli nie liczy: dodaj funkcję Edge `health` dostępną dla `anon` (bez danych, np. `select 1`)
   i zmień adres w workflow.
-- [ ] **[do sprawdzenia]** czy ponowne włączenie aktywnego workflow resetuje licznik 60 dni GitHub.
-  Sygnał awaryjny: e-mail GitHub o wyłączeniu harmonogramu.
+
+### Limit 60 dni GitHub (harmonogram)
+
+GitHub wyłącza harmonogram (`schedule`) w publicznym repozytorium po 60 dniach bez aktywności w repozytorium.
+Job `reenable` (`PUT /repos/{repo}/actions/workflows/keepalive.yml/enable`) działa tylko wtedy, gdy workflow
+się uruchomi. **Wyłączony workflow się nie uruchomi, więc `reenable` nie chroni przed tym wyłączeniem.**
+Nie dodajemy sztucznych commitów (np. automatycznych commitów z workflow).
+
+- Sygnał: e-mail od GitHub o wyłączeniu harmonogramu.
+- Ochrona: raz na mniej niż 60 dni dowolny commit w repozytorium lub ręczne uruchomienie
+  (Actions → „Keep-alive Supabase” → Run workflow; dla wyłączonego workflow najpierw „Enable workflow”).
+- [ ] Przypomnienie w kalendarzu właściciela co 50 dni: „marmaapps-static: sprawdź, czy Keep-alive
+  Supabase jest włączony; uruchom ręcznie”.
+- [ ] **[do sprawdzenia]** czy ręczne uruchomienie lub ponowne włączenie resetuje licznik 60 dni.
+  Do czasu potwierdzenia: commit lub ręczne uruchomienie przed upływem 60 dni.
 - [ ] Plan awaryjny: e-mail Supabase o wstrzymaniu → panel → Restore project.
 
 ---
