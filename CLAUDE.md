@@ -25,7 +25,7 @@ Zasady:
 - Każda nowa tabela: RLS włączone, jawny `GRANT` (Supabase nie wystawia nowych tabel automatycznie od 30.10.2026) i test negatywny pgTAP (`anon` i `authenticated` spoza listy nie widzą wierszy).
 - Brak polityk dla `anon` na danych punktów.
 - Nowe obiekty w `public` nie mają domyślnych uprawnień dla `anon`/`authenticated` (migracja RLS); każda migracja nadaje `GRANT` jawnie.
-- Logowanie tylko bez haseł: `is_allowed()` odrzuca sesje z `amr` innym niż `otp`/`magiclink`/`oauth`.
+- Logowanie tylko bez haseł: `is_allowed()` odrzuca sesje z `amr` innym niż `otp`/`magiclink`/`oauth`/`email/signup`.
 - Testy E2E z prawdziwymi danymi tylko ręcznie, na projekcie Supabase. CI używa tylko danych syntetycznych.
 - Dane w zgłoszeniach, logach i opisach PR zamaskowane (bez adresów e-mail, bez treści opisów).
 
