@@ -123,7 +123,7 @@ def _subject_id(point: dict) -> int:
         raise TransformError(
             f"Punkt Qdrant {point.get('id')!r}: brak payload.metadata.id"
         ) from None
-    if isinstance(raw, bool):
+    if isinstance(raw, bool) or (isinstance(raw, float) and not raw.is_integer()):
         raise TransformError(f"Punkt Qdrant {point.get('id')!r}: metadata.id={raw!r}")
     try:
         return int(raw)
@@ -145,6 +145,11 @@ def _embedding(point: dict) -> list[float]:
             f"Punkt Qdrant {point.get('id')!r}: wektor ma długość {len(vec)}, "
             f"oczekiwano {EMBEDDING_DIM}"
         )
+    for i, v in enumerate(vec):
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise TransformError(
+                f"Punkt Qdrant {point.get('id')!r}: element wektora [{i}]={v!r} nie jest liczbą"
+            )
     return [float(v) for v in vec]
 
 

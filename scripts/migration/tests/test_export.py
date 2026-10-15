@@ -20,6 +20,8 @@ def make_django_sqlite(path):
         f"""
         create table auth_user (id integer primary key, email text, password text);
         insert into auth_user values (1, '{FORBIDDEN_EMAIL}', 'x');
+        create table djstripe_customer (id integer primary key, email text, stripe_id text);
+        insert into djstripe_customer values (1, '{FORBIDDEN_EMAIL}', 'cus_x');
         create table pointsdb_marmapoint (id integer primary key, name text, alt_name text,
             location text, doshic_subtypes text);
         insert into pointsdb_marmapoint values (1, 'Punkt A', null, 'noga', 'vata');
@@ -64,6 +66,7 @@ def test_sqlite_export_reads_only_pointsdb_tables(tmp_path, monkeypatch):
     assert statements, "brak zarejestrowanych zapytań"
     for sql in statements:
         assert "auth_" not in sql
+        assert "djstripe" not in sql
         assert "sqlite_master" not in sql
         assert any(t in sql for t in SQLITE_TABLES), sql
     assert sorted(p.name for p in (out / "sqlite").iterdir()) == sorted(f"{t}.jsonl" for t in SQLITE_TABLES)
@@ -129,11 +132,106 @@ def test_rethink_docs_are_written_with_primary_key(tmp_path):
     assert manifest["rethinkdb"] == {"db": "marmaapp", "table": "marma_points", "primary_key": "id", "count": 1}
 
 
-def test_value_without_json_form_stops_export(tmp_path):
+def test_value_without_json_form_stops_export_with_source_name(tmp_path):
     docs = [{"id": "Punkt A", "updated": datetime.datetime(2024, 1, 1)}]
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ExportError, match=r"marmaapp\.marma_points.*datetime"):
         write_rethink_docs(docs, "id", "marmaapp", "marma_points", tmp_path)
+
+
+def test_sqlite_value_without_json_form_names_table(tmp_path):
+    db = tmp_path / "django.sqlite3"
+    make_django_sqlite(db)
+    conn = sqlite3.connect(db)
+    conn.execute("update pointsdb_subject set name = x'00ff'")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(ExportError, match=r"pointsdb_subject.*bytes"):
+        export_sqlite(db, tmp_path / "out")
+
+
+def test_sqlite_export_never_reads_account_tables(tmp_path, monkeypatch):
+    db = tmp_path / "django.sqlite3"
+    make_django_sqlite(db)
+    read_tables = set()
+    real_connect = sqlite3.connect
+
+    def authorizing_connect(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+
+        def authorizer(action, arg1, arg2, dbname, source):
+            if action == sqlite3.SQLITE_READ:
+                read_tables.add(arg1)
+            return sqlite3.SQLITE_OK
+
+        conn.set_authorizer(authorizer)
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", authorizing_connect)
+
+    export_sqlite(db, tmp_path / "out")
+
+    assert read_tables == set(SQLITE_TABLES)
+
+
+def mode(path):
+    return path.stat().st_mode & 0o777
+
+
+def test_export_files_and_directories_are_private(tmp_path):
+    db = tmp_path / "django.sqlite3"
+    make_django_sqlite(db)
+    out = tmp_path / "nowy" / "data-export"
+
+    export_sqlite(db, out)
+    write_rethink_docs([{"id": "Punkt A"}], "id", "marmaapp", "marma_points", out)
+
+    assert mode(tmp_path / "nowy") == 0o700
+    assert mode(out) == 0o700
+    assert mode(out / "sqlite") == 0o700
+    files = [p for p in out.rglob("*") if p.is_file()]
+    assert files
+    for p in files:
+        assert mode(p) == 0o600, p
+
+
+def test_existing_export_file_becomes_private(tmp_path):
+    out = tmp_path / "data-export"
+    out.mkdir()
+    (out / "rethinkdb_docs.jsonl").write_text("")
+    (out / "rethinkdb_docs.jsonl").chmod(0o644)
+
+    write_rethink_docs([{"id": "Punkt A"}], "id", "marmaapp", "marma_points", out)
+
+    assert mode(out / "rethinkdb_docs.jsonl") == 0o600
+
+
+def test_main_sets_umask_before_writing(tmp_path, monkeypatch):
+    import export_from_droplet
+
+    db = tmp_path / "django.sqlite3"
+    make_django_sqlite(db)
+    calls = []
+    real_mkdir = type(tmp_path).mkdir
+
+    def fake_umask(value):
+        calls.append(("umask", value))
+        return 0o022
+
+    def recording_mkdir(self, *args, **kwargs):
+        calls.append(("mkdir", self))
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(export_from_droplet.os, "umask", fake_umask)
+    monkeypatch.setattr(type(tmp_path), "mkdir", recording_mkdir)
+
+    code = export_from_droplet.main(
+        ["--export-dir", str(tmp_path / "out"), "--sources", "sqlite", "--sqlite-path", str(db)]
+    )
+
+    assert code == 0
+    assert calls[0] == ("umask", 0o077)
 
 
 def test_full_export_round_trip(tmp_path):

@@ -7,6 +7,7 @@ tabele punktów, więc nigdy nie może trafić na projekt w chmurze.
 import os
 from urllib.parse import urlparse
 
+import psycopg
 import pytest
 
 from helpers import sample_source, vector
@@ -22,7 +23,6 @@ TEST_EMAIL = "import-test@example.com"
 
 @pytest.fixture
 def conn():
-    psycopg = pytest.importorskip("psycopg")
     url = os.environ.get("SUPABASE_DB_URL")
     if not url:
         pytest.skip("brak SUPABASE_DB_URL (lokalny stack Supabase)")
@@ -80,7 +80,7 @@ def test_failure_in_the_middle_rolls_back(conn):
     # Wektor o złej długości odrzuca baza dopiero przy ostatniej tabeli (po TRUNCATE i rodzicach).
     broken.subject_embeddings.append({"subject_id": 7, "is_polish": False, "embedding": vector(dim=3)})
 
-    with pytest.raises(Exception):
+    with pytest.raises(psycopg.Error, match=r"expected 1536 dimensions, not 3"):
         import_rows(conn, broken)
 
     assert fetch_target_counts(conn) == before

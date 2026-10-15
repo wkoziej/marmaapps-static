@@ -63,6 +63,7 @@ kill %1
 SQLite jest plikiem na droplecie. Nie kopiuj całej bazy (zawiera tabele kont). Przenieś tylko tabele `pointsdb_*` (wymaga `sqlite3` na droplecie lub w kontenerze; do sprawdzenia):
 
 ```bash
+umask 077   # pliki eksportu tylko dla właściciela (0600/0700)
 mkdir -p data-export
 ssh droplet "sqlite3 -readonly <ścieżka>/prod-db.sqlite3 '.dump pointsdb_%'" \
   | sqlite3 data-export/pointsdb-only.sqlite3
@@ -70,7 +71,11 @@ uv run --project scripts/migration python scripts/migration/export_from_droplet.
   --sources sqlite --sqlite-path data-export/pointsdb-only.sqlite3
 ```
 
+Polecenie nie tworzy plików na droplecie. Jeżeli mimo to zapisałeś tam zrzut lub kopię (np. przy sprawdzaniu ścieżki), usuń je z dropletu.
+
 Kolejne uruchomienia z różnymi `--sources` uzupełniają ten sam `manifest.json`.
+
+Skrypt eksportu ustawia `umask 077`: katalogi eksportu mają prawa 0700, pliki 0600. Wartość bez reprezentacji JSON (np. data `datetime`) przerywa eksport z nazwą źródła i tabeli; skrypt jej nie konwertuje.
 
 Sprawdź, że eksport jest poza git: `git status` nie może pokazywać `data-export/`.
 
@@ -78,9 +83,11 @@ Sprawdź, że eksport jest poza git: `git status` nie może pokazywać `data-exp
 
 ```bash
 uv run --project scripts/migration python scripts/migration/import_to_supabase.py \
-  --export-dir data-export --yes
+  --export-dir data-export --confirm-host <host bazy docelowej>
 ```
 
+- `--confirm-host` musi być równy hostowi z `SUPABASE_DB_URL` (np. `db.<ref>.supabase.co` albo host poolera). Skrypt najpierw wypisuje host, port i nazwę bazy (bez hasła). Brak flagi, inny host lub brak `SUPABASE_DB_URL` → kod 2, bez połączenia z bazą.
+- Uszkodzony lub niepełny eksport albo błąd transformacji → kod 1 i komunikat `BŁĄD …` (dotyczy też `verify_counts.py`).
 - Najpierw transformacja. Błąd danych (np. wektor o długości ≠ 1536, wektor bez `metadata.id`) przerywa skrypt przed połączeniem z bazą.
 - Jedna transakcja: `TRUNCATE` 6 tabel punktów (`RESTART IDENTITY CASCADE`), `INSERT` rodzic → dziecko z zachowanymi id, ustawienie sekwencji identity na `max(id) + 1`. Błąd w połowie → rollback, dane bez zmian.
 - Ponowne uruchomienie daje ten sam stan.

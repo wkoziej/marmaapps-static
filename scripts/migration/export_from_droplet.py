@@ -19,12 +19,17 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from export_files import QDRANT_FILE, RETHINK_FILE, write_jsonl, write_manifest
+from export_files import (
+    QDRANT_FILE,
+    RETHINK_FILE,
+    ExportError,
+    ensure_private_dir,
+    write_jsonl,
+    write_manifest,
+)
 from transform import SQLITE_TABLES
 
-
-class ExportError(Exception):
-    pass
+__all__ = ["ExportError", "export_qdrant", "export_sqlite", "write_rethink_docs", "main"]
 
 
 def export_sqlite(db_path: Path, export_dir: Path) -> dict[str, int]:
@@ -41,7 +46,9 @@ def export_sqlite(db_path: Path, export_dir: Path) -> dict[str, int]:
             except sqlite3.OperationalError as e:
                 raise ExportError(f"Nie można odczytać tabeli {table}: {e}") from e
             counts[table] = write_jsonl(
-                export_dir / "sqlite" / f"{table}.jsonl", (dict(row) for row in cur)
+                export_dir / "sqlite" / f"{table}.jsonl",
+                (dict(row) for row in cur),
+                source=f"SQLite {table}",
             )
     finally:
         conn.close()
@@ -63,7 +70,7 @@ def fetch_rethink_docs(host, port, db, table, user, password) -> tuple[list[dict
 
 def write_rethink_docs(docs, primary_key, db, table, export_dir: Path) -> int:
     ordered = sorted(docs, key=lambda d: str(d.get(primary_key)))
-    count = write_jsonl(export_dir / RETHINK_FILE, ordered)
+    count = write_jsonl(export_dir / RETHINK_FILE, ordered, source=f"RethinkDB {db}.{table}")
     write_manifest(
         export_dir,
         {"rethinkdb": {"db": db, "table": table, "primary_key": primary_key, "count": count}},
@@ -87,12 +94,14 @@ def export_qdrant(client, collection: str, export_dir: Path, page_size: int = 25
             if offset is None:
                 return
 
-    count = write_jsonl(export_dir / QDRANT_FILE, pages())
+    count = write_jsonl(export_dir / QDRANT_FILE, pages(), source=f"Qdrant {collection}")
     write_manifest(export_dir, {"qdrant": {"collection": collection, "count": count}})
     return count
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Pliki i katalogi eksportu tylko dla właściciela (0600/0700), także tworzone przez biblioteki.
+    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--export-dir", type=Path, default=Path("data-export"))
     parser.add_argument(
@@ -117,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"nieznane źródła: {sorted(unknown)}")
 
-    args.export_dir.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(args.export_dir)
     write_manifest(args.export_dir, {"exported_at": datetime.now(timezone.utc).isoformat()})
 
     if "sqlite" in sources:

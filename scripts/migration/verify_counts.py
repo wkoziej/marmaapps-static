@@ -4,7 +4,8 @@ Użycie (connection string z env SUPABASE_DB_URL):
     uv run --project scripts/migration python scripts/migration/verify_counts.py --export-dir data-export
 
 Raport zawiera tylko liczby, nazwy punktów i identyfikatory (bez opisów).
-Kod wyjścia 1, gdy liczba w dowolnej tabeli się różni; 2 przy błędzie konfiguracji.
+Kod wyjścia 1, gdy liczba w dowolnej tabeli się różni lub eksport jest uszkodzony;
+2 przy błędzie konfiguracji.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-from transform import TARGET_TABLES, Report, transform_all
+from transform import TARGET_TABLES, Report, TransformError, transform_all
 
 DOC_COUNT_KEY = "marma_points.doc"
 
@@ -87,7 +88,7 @@ def fetch_target_counts(conn) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     import psycopg
 
-    from export_files import load_export
+    from export_files import ExportFormatError, load_export
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--export-dir", type=Path, default=Path("data-export"))
@@ -98,7 +99,11 @@ def main(argv: list[str] | None = None) -> int:
         print("Brak zmiennej SUPABASE_DB_URL (zob. .envrc).", file=sys.stderr)
         return 2
 
-    _, report = transform_all(load_export(args.export_dir))
+    try:
+        _, report = transform_all(load_export(args.export_dir))
+    except (TransformError, ExportFormatError) as e:
+        print(f"BŁĄD danych eksportu (weryfikacja przerwana): {e}", file=sys.stderr)
+        return 1
     with psycopg.connect(db_url) as conn:
         actual = fetch_target_counts(conn)
     code, text = verify(expected_counts(report), actual, report)

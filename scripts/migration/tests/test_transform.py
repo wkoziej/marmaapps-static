@@ -169,3 +169,31 @@ def test_transform_does_not_modify_source():
     transform_all(source)
 
     assert repr(source) == before
+
+
+def test_subject_id_float_with_fraction_raises_error():
+    source = sample_source()
+    source.qdrant_points = [qdrant_point("ulamek", 12.5)]
+
+    with pytest.raises(TransformError, match="ulamek"):
+        transform_all(source)
+
+
+def test_subject_id_whole_float_is_accepted():
+    source = sample_source()
+    source.qdrant_points = [qdrant_point("u-1", 7.0)]
+
+    rows, _ = transform_all(source)
+
+    assert rows.subject_embeddings[0]["subject_id"] == 7
+
+
+@pytest.mark.parametrize("bad", [None, "0.5", "abc", True])
+def test_vector_element_that_is_not_a_number_raises_error_with_point_id(bad):
+    source = sample_source()
+    point = qdrant_point("zly-element", 7)
+    point["vector"][3] = bad
+    source.qdrant_points.append(point)
+
+    with pytest.raises(TransformError, match="zly-element"):
+        transform_all(source)

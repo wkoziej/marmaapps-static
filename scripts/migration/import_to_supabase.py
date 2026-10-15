@@ -2,7 +2,7 @@
 
 Użycie (connection string z env SUPABASE_DB_URL, ładowany przez direnv z pass):
     uv run --project scripts/migration python scripts/migration/import_to_supabase.py \\
-        --export-dir data-export --yes
+        --export-dir data-export --confirm-host <host z SUPABASE_DB_URL>
 
 Jedna transakcja: TRUNCATE 6 tabel punktów (RESTART IDENTITY CASCADE), INSERT
 rodzic → dziecko z zachowanymi id, ustawienie sekwencji identity. Błąd → rollback.
@@ -15,6 +15,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from transform import TARGET_TABLES, TargetRows, TransformError, transform_all
 
@@ -73,15 +74,29 @@ def import_rows(conn, rows: TargetRows) -> dict[str, int]:
     return rows.counts()
 
 
+def describe_target(db_url: str) -> tuple[str | None, str]:
+    """Host i opis celu (host, port, baza) bez hasła i bez pełnego URL."""
+    parsed = urlparse(db_url)
+    host = parsed.hostname
+    try:
+        port = parsed.port or 5432
+    except ValueError:
+        port = "?"
+    database = parsed.path.lstrip("/") or "?"
+    return host, f"host={host or '?'} port={port} baza={database}"
+
+
 def main(argv: list[str] | None = None) -> int:
     import psycopg
 
-    from export_files import load_export
+    from export_files import ExportFormatError, load_export
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--export-dir", type=Path, default=Path("data-export"))
     parser.add_argument(
-        "--yes", action="store_true", help="potwierdzenie: zastąp dane punktów w bazie docelowej"
+        "--confirm-host",
+        metavar="HOST",
+        help="potwierdzenie celu: host z SUPABASE_DB_URL; import zastępuje dane punktów w tej bazie",
     )
     args = parser.parse_args(argv)
 
@@ -89,14 +104,27 @@ def main(argv: list[str] | None = None) -> int:
     if not db_url:
         print("Brak zmiennej SUPABASE_DB_URL (zob. .envrc).", file=sys.stderr)
         return 2
-    if not args.yes:
-        print("Import usuwa obecne dane punktów w bazie docelowej. Dodaj --yes.", file=sys.stderr)
+    host, target = describe_target(db_url)
+    print(f"Baza docelowa: {target}")
+    if not args.confirm_host:
+        print(
+            "Import usuwa obecne dane punktów w bazie docelowej. "
+            "Dodaj --confirm-host z hostem bazy docelowej.",
+            file=sys.stderr,
+        )
+        return 2
+    if not host or args.confirm_host != host:
+        print(
+            f"BŁĄD: --confirm-host {args.confirm_host!r} nie zgadza się z hostem bazy docelowej "
+            f"({host!r}). Nic nie zaimportowano.",
+            file=sys.stderr,
+        )
         return 2
 
     try:
         rows, report = transform_all(load_export(args.export_dir))
-    except TransformError as e:
-        print(f"BŁĄD transformacji (nic nie zaimportowano): {e}", file=sys.stderr)
+    except (TransformError, ExportFormatError) as e:
+        print(f"BŁĄD danych eksportu (nic nie zaimportowano): {e}", file=sys.stderr)
         return 1
 
     with psycopg.connect(db_url, autocommit=True) as conn:

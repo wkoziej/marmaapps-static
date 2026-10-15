@@ -1,4 +1,4 @@
-from helpers import sample_source
+from helpers import qdrant_point, sample_source
 from transform import transform_all
 from verify_counts import compare_counts, expected_counts, verify
 
@@ -46,15 +46,41 @@ def test_verify_success_exit_code_zero():
     assert "OK" in text
 
 
-def test_verify_failure_exit_code_nonzero_and_names_table():
+def error_tables(text):
+    errors = [line for line in text.splitlines() if line.startswith("BŁĄD")]
+    assert len(errors) == 1, text
+    return errors[0].split(":", 1)[1].split(":", 1)[1].strip().split(", ")
+
+
+def marked_rows(text):
+    return [line.split()[0] for line in text.splitlines() if "RÓŻNICA" in line]
+
+
+def test_verify_failure_exit_code_nonzero_and_names_only_that_table():
     _, report = transform_all(sample_source())
     expected = expected_counts(report)
     target = dict(expected, marma_point_subjects=0)
 
     code, text = verify(expected, target, report)
 
-    assert code != 0
-    assert "marma_point_subjects" in text
+    assert code == 1
+    assert error_tables(text) == ["marma_point_subjects"]
+    assert marked_rows(text) == ["marma_point_subjects"]
+
+
+def test_skipped_orphan_vector_fails_verification_on_subject_embeddings():
+    source = sample_source()
+    source.qdrant_points.append(qdrant_point("sierota", 999))
+    rows, report = transform_all(source)
+    expected = expected_counts(report)
+    # Stan bazy po imporcie: wiersze po transformacji (sierota pominięta).
+    actual = dict(rows.counts(), **{"marma_points.doc": expected["marma_points.doc"]})
+
+    code, text = verify(expected, actual, report)
+
+    assert code == 1
+    assert error_tables(text) == ["subject_embeddings"]
+    assert marked_rows(text) == ["subject_embeddings"]
 
 
 def test_expected_counts_come_from_source_not_from_transformed_rows():

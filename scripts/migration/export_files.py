@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Iterable
 
@@ -20,22 +21,48 @@ QDRANT_FILE = "qdrant_points.jsonl"
 
 
 class ExportFormatError(Exception):
-    pass
+    """Katalog eksportu jest niepełny lub uszkodzony."""
 
 
-def _strict_default(value):
-    raise TypeError(
-        f"Wartość typu {type(value).__name__} nie ma reprezentacji JSON; "
-        "eksport przerwany, aby nie zmieniać danych po cichu"
-    )
+class ExportError(Exception):
+    """Eksport ze źródła przerwany (np. wartość bez reprezentacji JSON)."""
 
 
-def write_jsonl(path: Path, records: Iterable[dict]) -> int:
-    path.parent.mkdir(parents=True, exist_ok=True)
+DIR_MODE = 0o700
+FILE_MODE = 0o600
+
+
+def ensure_private_dir(path: Path) -> None:
+    """Tworzy katalog i brakujących rodziców z prawami 0700 (tylko właściciel)."""
+    missing = []
+    while not path.exists():
+        missing.append(path)
+        path = path.parent
+    for p in reversed(missing):
+        p.mkdir(mode=DIR_MODE)
+        p.chmod(DIR_MODE)  # mode w mkdir podlega umask
+
+
+def _open_private(path: Path):
+    ensure_private_dir(path.parent)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, FILE_MODE)
+    os.fchmod(fd, FILE_MODE)  # plik mógł już istnieć z innymi prawami
+    return os.fdopen(fd, "w", encoding="utf-8")
+
+
+def write_jsonl(path: Path, records: Iterable[dict], source: str | None = None) -> int:
+    source = source or path.name
+
+    def strict_default(value):
+        raise ExportError(
+            f"{source}: wartość typu {type(value).__name__} nie ma reprezentacji JSON; "
+            "eksport przerwany, aby nie zmieniać danych po cichu"
+        )
+
     count = 0
-    with path.open("w", encoding="utf-8") as f:
+    with _open_private(path) as f:
         for record in records:
-            f.write(json.dumps(record, ensure_ascii=False, default=_strict_default))
+            f.write(json.dumps(record, ensure_ascii=False, default=strict_default))
             f.write("\n")
             count += 1
     return count
@@ -50,10 +77,19 @@ def write_manifest(export_dir: Path, manifest: dict) -> None:
     path = export_dir / MANIFEST
     current = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     current.update(manifest)
-    path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _open_private(path) as f:
+        f.write(json.dumps(current, ensure_ascii=False, indent=2))
 
 
 def load_export(export_dir: Path) -> SourceData:
+    try:
+        return _load_export(export_dir)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        # ValueError obejmuje json.JSONDecodeError i UnicodeDecodeError.
+        raise ExportFormatError(f"Nie można wczytać eksportu z {export_dir}: {type(e).__name__}: {e}") from e
+
+
+def _load_export(export_dir: Path) -> SourceData:
     manifest_path = export_dir / MANIFEST
     if not manifest_path.exists():
         raise ExportFormatError(f"Brak {manifest_path}; uruchom najpierw eksport")
