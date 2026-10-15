@@ -223,6 +223,25 @@ Deno.test("fraza dłuższa niż limit → 400; fraza o długości limitu → 200
   assert.equal(res.status, 200);
 });
 
+Deno.test("długość frazy w znakach (code points), nie w jednostkach UTF-16", async () => {
+  let f = setup();
+  let res = await createHandler(f.deps)(request("😀".repeat(MAX)));
+  assert.equal(res.status, 200);
+  f = setup();
+  res = await createHandler(f.deps)(request("😀".repeat(MAX + 1)));
+  assert.equal(res.status, 400);
+  assert.deepEqual(f.rpcCalls, []);
+});
+
+Deno.test("fraza ze znakiem sterującym (NUL, tab, DEL) → 400 przed listą i limitem", async () => {
+  for (const q of ["a\u0000b", "a\u0007", "ból\u007f"]) {
+    const f = setup();
+    const res = await createHandler(f.deps)(request(q));
+    assert.equal(res.status, 400, JSON.stringify(q));
+    assert.deepEqual(f.rpcCalls, []);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Autoryzacja (401, 403) i limit (429).
 // ---------------------------------------------------------------------------

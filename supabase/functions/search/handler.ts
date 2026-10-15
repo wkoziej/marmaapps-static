@@ -47,6 +47,7 @@ export const EMBEDDING_DIMENSIONS = 1536;
 
 const MESSAGES = {
   noPhrase: "Podaj frazę wyszukiwania (parametr problem).",
+  invalidPhrase: "Fraza zawiera niedozwolone znaki.",
   tooLong: (max: number) => `Fraza jest za długa (maksymalnie ${max} znaków).`,
   unauthorized: "Sesja wygasła lub jest nieprawidłowa. Zaloguj się ponownie.",
   forbidden: "Brak dostępu. Ten adres e-mail nie jest na liście dozwolonych.",
@@ -124,6 +125,9 @@ function requirePhrase(url: URL, maxLength: number): string {
   if (phrase === null || phrase.trim() === "") throw new HttpError(400, MESSAGES.noPhrase);
   // Długość w znakach (code points), nie w jednostkach UTF-16.
   if ([...phrase].length > maxLength) throw new HttpError(400, MESSAGES.tooLong(maxLength));
+  // Znaki sterujące (np. NUL) odrzuca baza; lepiej 400 przed listą i limitem niż 500.
+  // deno-lint-ignore no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(phrase)) throw new HttpError(400, MESSAGES.invalidPhrase);
   return phrase;
 }
 

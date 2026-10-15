@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(27);
 
 -- ---------------------------------------------------------------------------
 -- Struktura i uprawnienia.
@@ -102,6 +102,9 @@ reset role;
 select is(
   (select minute_count from private.search_quota where user_id = '00000000-0000-0000-0000-00000000000a'),
   1, 'nowe okno minutowe: licznik od 1');
+select is(
+  (select day_count from private.search_quota where user_id = '00000000-0000-0000-0000-00000000000a'),
+  31, 'nowe okno minutowe nie zeruje licznika dobowego');
 
 -- ---------------------------------------------------------------------------
 -- Limit dobowy.

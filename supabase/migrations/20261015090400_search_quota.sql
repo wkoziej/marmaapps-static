@@ -1,7 +1,9 @@
 -- Limit zapytań funkcji Edge `search` na użytkownika (U4).
--- Chroni koszty OpenAI i ogranicza tempo pobierania opisów przez jedno konto.
+-- Chroni koszty OpenAI i wywołań Edge. NIE ogranicza pobierania danych: użytkownik z listy
+-- może czytać tabele i funkcje bezpośrednio przez API (ryzyko zaakceptowane przez właściciela).
 -- Limit jest zużywany przez każde poprawne żądanie użytkownika z listy (także bez OpenAI):
--- ścieżka tekstowa też odczytuje dane punktów, a jedna reguła jest prostsza do wyjaśnienia.
+-- jedna reguła jest prostsza do wyjaśnienia. Żądanie zakończone 500/502 też zużywa limit
+-- (frontend nie ponawia żądań automatycznie).
 -- Okna stałe: minuta i doba (UTC). Odrzucone żądanie nie zwiększa liczników.
 
 create table private.search_quota (
