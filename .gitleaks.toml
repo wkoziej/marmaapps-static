@@ -1,0 +1,10 @@
+title = "marmaapps-static"
+
+[extend]
+useDefault = true
+
+# Klucz publishable Supabase jest publiczny z założenia (bezpieczeństwo zapewnia RLS).
+# Klucze secret (sb_secret_...) i service_role nadal są wykrywane.
+[[allowlists]]
+description = "Publiczny klucz Supabase w konfiguracji builda"
+regexes = ['''sb_publishable_[A-Za-z0-9_-]+''']

@@ -1,0 +1,25 @@
+{
+  "name": "marmaapps-static",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run --passWithNoTests",
+    "test:guard": "scripts/tests/check-no-data.test.sh",
+    "check:data": "scripts/check-no-data.sh --all",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "scripts/pre-commit.sh"
+  },
+  "devDependencies": {
+    "deno": "^2.9.6",
+    "simple-git-hooks": "^2.14.0",
+    "supabase": "^2.121.0",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}
