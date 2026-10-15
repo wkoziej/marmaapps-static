@@ -62,3 +62,18 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  database:
+    name: Testy bazy (pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lokalna baza Supabase (migracje)
+        run: npx supabase db start
+      - name: pgTAP
+        run: npx supabase test db
