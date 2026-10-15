@@ -4,6 +4,8 @@ Interaktywny model 3D punktów marma z wyszukiwaniem. Statyczna strona na GitHub
 
 Dostęp mają tylko zalogowani użytkownicy z listy dozwolonych adresów. Repozytorium nie zawiera danych punktów (zob. `CLAUDE.md`).
 
+Przełączenie domeny, okres próbny i wyłączenie starego serwera: [`docs/cutover-runbook.md`](docs/cutover-runbook.md).
+
 ## Narzędzia
 
 - Node.js 22+ (`npm install` instaluje też Supabase CLI, Deno i hook pre-commit).
