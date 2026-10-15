@@ -93,3 +93,14 @@ jobs:
         run: npm run test:functions
       - name: deno check (index.ts, zależności z deno.lock)
         run: npm run check:functions
+
+  migration-scripts:
+    name: Skrypty migracji (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.5.29"
+      - name: pytest (bez testów integracyjnych)
+        run: uv run --project scripts/migration pytest scripts/migration -m "not integration"
