@@ -29,3 +29,6 @@ supabase/functions/**/.env
 __pycache__/
 .venv/
 .pytest_cache/
+
+# Model 3D: licencja niepotwierdzona, kopia tylko lokalnie (zob. README.md)
+public/models/human.glb

@@ -15,8 +15,24 @@ Dostęp mają tylko zalogowani użytkownicy z listy dozwolonych adresów. Repozy
 
 ```bash
 npm install
+cp .env.example .env.local   # uzupełnij VITE_SUPABASE_URL i VITE_SUPABASE_PUBLISHABLE_KEY
 npm run dev
 ```
+
+### Model 3D (`public/models/human.glb`)
+
+Model nie jest w repozytorium: licencja nie jest jeszcze potwierdzona przez właściciela, a ścieżka jest w `.gitignore`.
+Skopiuj plik ręcznie z prywatnego repozytorium `marmaapps` (`djangoapp/static/mpoints/assets/human.glb`) do `public/models/human.glb`.
+Bez pliku strona punktów działa, ale model się nie wczytuje (błąd w konsoli). `npm run build` kopiuje plik do `dist/models/`.
+
+## Frontend
+
+- Strony (wejścia Vite, multi-page w `vite.config.js`): `index.html` (start), `points.html` (model 3D i wyszukiwanie).
+- Kod w `src/`: `points.js` (start strony punktów), `home.js`, `layout.js` (nawigacja, wylogowanie), `config.js` (zmienne `VITE_*`),
+  `services/ApiService.js` (funkcja Edge `search`), `features/search/`, `managers/`, `utils/`, `constants/` (teksty PL).
+- `src/auth/session.js`: punkt integracji sesji (`getAccessToken`, `onSessionExpired`, `signOut`). Logowanie dodaje U7.
+- three.js 0.128.0 z npm (`GLTFLoader`, `OrbitControls` z `three/examples/jsm`).
+- `BASE_PATH=/marmaapps-static/ npm run build` — build dla tymczasowego adresu GitHub Pages.
 
 ## Testy
 

@@ -1,0 +1,48 @@
+/* Main layout containers */
+.l-pointsdb {
+    display: grid;
+    grid-template-columns: minmax(auto, 60%) minmax(auto, 40%);
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md);
+    height: calc(100vh - 120px);
+}
+
+.l-ui {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    overflow: hidden;
+    height: 85vh;
+}
+
+.l-results {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: var(--spacing-md);
+    flex: 1;
+    height: calc(70vh);  /* ✅ Wysokość viewportu minus wysokość nawigacji */
+    position: relative;
+}
+
+.l-model {
+    position: relative;
+    height: calc(85vh);
+    max-width: 100%;
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+    .l-pointsdb {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .l-results {
+        grid-template-columns: 1fr;
+    }
+    
+    .l-model {
+        height: 50vh;
+    }
+} 

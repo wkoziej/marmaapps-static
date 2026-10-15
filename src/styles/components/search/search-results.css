@@ -1,0 +1,56 @@
+.search-results {
+    height: 80vh;
+    overflow-y: auto;
+    background-color: var(--color-background);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-md);
+}
+
+.search-results__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.search-results__item {
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background-color: var(--color-background);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-results__item:hover {
+    background-color: var(--color-highlight);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.search-results__item--selected {
+    background-color: var(--color-primary);
+    color: var(--color-text-light);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.search-results__item--selected:hover {
+    background-color: var(--color-primary-dark);
+}
+
+/* Stylizacja paska przewijania */
+.search-results::-webkit-scrollbar {
+    width: 8px;
+}
+
+.search-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+    background-color: var(--color-primary);
+    border-radius: var(--border-radius-sm);
+}
+
+.search-results::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-primary-dark);
+} 

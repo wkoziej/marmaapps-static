@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baza punktów marma</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg" crossorigin="anonymous">
+    <link rel="icon" href="/images/favicon.png" type="image/png">
+    <script type="module" src="/src/points.js"></script>
+</head>
+<body class="flex flex-col h-screen bg-gray-100">
+    <!-- Nagłówek -->
+    <header class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Marma Applications</h1>
+            <div class="flex items-center space-x-4">
+                <!-- Wylogowanie: logika sesji w src/auth/session.js (U7) -->
+                <button type="button" id="logout-button" data-testid="logout-button"
+                    class="flex items-center bg-transparent border-none text-white cursor-pointer">
+                    <i data-lucide="log-out" class="mr-2"></i>
+                    Wyloguj
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Nawigacja -->
+    <nav class="bg-blue-500 text-white">
+        <div class="container mx-auto flex">
+            <a href="./" data-nav="home" class="flex items-center p-4">
+                <i data-lucide="house" class="mr-2"></i>
+                Strona główna
+            </a>
+            <a href="./points.html" data-nav="points" class="flex items-center p-4">
+                <i data-lucide="map-pin" class="mr-2"></i>
+                Baza punktów marma
+            </a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="l-pointsdb" id="l-pointsdb">
+            <div class="l-ui" id="l-ui">
+                <div class="search-bar" id="search-bar" data-testid="search-container">
+                    <input
+                        type="text"
+                        id="search-bar__input"
+                        name="search-bar__input"
+                        class="search-bar__input"
+                        data-testid="search-input"
+                        placeholder="Wpisz dolegliwość, doshę lub nazwę punktu marma">
+                    <button
+                        id="search-bar__button"
+                        class="search-bar__button"
+                        data-testid="search-button">
+                        🔍
+                    </button>
+                </div>
+
+                <div class="l-results" id="l-results">
+                    <div class="search-results" id="search-results" data-testid="search-results"></div>
+                    <div class="point-details" id="point-details" data-testid="point-details">
+                        <div class="point-details__content" id="point-details__content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="l-model" id="l-model">
+                <div class="model-controls">
+                    <input
+                        type="checkbox"
+                        id="model-controls__checkbox"
+                        name="model-controls__checkbox"
+                        class="model-controls__checkbox"
+                        data-testid="label-toggle">
+                    <label
+                        for="model-controls__checkbox"
+                        class="model-controls__label">
+                        Wyświetlaj etykiety dla znalezionych punktów
+                    </label>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Stopka -->
+    <footer class="bg-gray-200 p-4 text-center">
+        <p>&copy; <span id="footer-year"></span> I to i to: Marma Applications</p>
+    </footer>
+</body>
+</html>
