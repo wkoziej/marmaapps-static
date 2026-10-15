@@ -98,7 +98,7 @@ Postgres, funkcja `private.before_user_created_hook`. Lokalnie włącza go `supa
 
 ## Wymagane ustawienia Auth w projekcie Supabase
 
-Lokalnie ustawia je `supabase/config.toml`. W projekcie w chmurze trzeba je ustawić w panelu (pełna lista: `docs/supabase-setup.md`, U8):
+Lokalnie ustawia je `supabase/config.toml`. W projekcie w chmurze trzeba je ustawić w panelu (pełna lista: `docs/supabase-setup.md`):
 
 - Authentication → Hooks → „Before User Created” → funkcja `private.before_user_created_hook`. **Bez hooka każdy może założyć konto** (dane nadal chroni RLS).
 - Authentication → Providers → Email → „Confirm email” włączone.
@@ -134,3 +134,41 @@ Lokalnie: `supabase/functions/.env` (wykluczony z git) z `ALLOWED_ORIGINS=http:/
 `npx supabase functions serve --env-file supabase/functions/.env`. Bez `OPENAI_API_KEY` ścieżka
 semantyczna zwraca 502. Uwaga: lokalna brama (Kong) sama obsługuje `OPTIONS` i nadpisuje
 `Access-Control-Allow-Origin` na `*`, więc ograniczenie originów da się sprawdzić tylko na projekcie w chmurze.
+
+## Wdrożenie
+
+Pełna lista ustawień usług i test dymny: `docs/supabase-setup.md`.
+
+| Workflow | Wyzwalacz | Co robi |
+| --- | --- | --- |
+| `.github/workflows/deploy.yml` | push do `main`, ręcznie | build Vite → GitHub Pages |
+| `.github/workflows/deploy-supabase.yml` | tylko ręcznie, akceptacja w środowisku `production` | `supabase db push` + `supabase functions deploy search` |
+| `.github/workflows/keepalive.yml` | co ok. 3 dni, ręcznie | zapytanie bez danych punktów do projektu Supabase; ponowne włączenie harmonogramu |
+
+Strona: konfiguracja publiczna z repository variables (`BASE_PATH`, `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`). Model 3D `public/models/human.glb` nie jest w repozytorium:
+workflow pobiera go z `HUMAN_MODEL_URL` i sprawdza sumę `HUMAN_MODEL_SHA256`. Lokalnie skopiuj plik
+do `public/models/` (plik wykluczony z git).
+
+Supabase: sekrety `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` są tylko
+sekretami środowiska `production` (wymagana akceptacja właściciela). Sekrety funkcji
+(`OPENAI_API_KEY`, `ALLOWED_ORIGINS`) ustawia właściciel lokalnie: `npx supabase secrets set`
+(`docs/supabase-setup.md`, sekcja 7). Workflow nie wykonuje `supabase config push`.
+
+Lokalnie (zamiast workflow):
+
+```bash
+npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
+npx supabase db push --dry-run   # przegląd migracji
+npx supabase db push
+npx supabase functions deploy search
+```
+
+## Test regresji wyszukiwania (ręcznie)
+
+```bash
+npx playwright install chromium
+E2E_BASE_URL=https://wkoziej.github.io/marmaapps-static/ E2E_STORAGE_STATE=e2e/.auth/session.json npm run test:e2e
+```
+
+Tylko na projekcie Supabase z prawdziwymi danymi, nigdy w CI. Szczegóły i zapis sesji: `e2e/README.md`.

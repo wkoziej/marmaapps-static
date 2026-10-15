@@ -12,12 +12,14 @@
     "test:functions": "deno test --config supabase/functions/search/deno.json supabase/functions/search/",
     "check:functions": "deno check --config supabase/functions/search/deno.json supabase/functions/search/index.ts",
     "check:data": "scripts/check-no-data.sh --all",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "test:e2e": "playwright test"
   },
   "simple-git-hooks": {
     "pre-commit": "scripts/pre-commit.sh"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "deno": "^2.9.6",
     "jsdom": "30.1.1",
     "simple-git-hooks": "^2.14.0",

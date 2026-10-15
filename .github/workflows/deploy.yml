@@ -1,0 +1,101 @@
+name: Wdrożenie strony (GitHub Pages)
+
+# Build Vite → GitHub Pages. Konfiguracja: docs/supabase-setup.md, sekcja „GitHub”.
+# Publiczna konfiguracja z repository variables (Settings → Secrets and variables → Actions → Variables):
+#   BASE_PATH                      — "/marmaapps-static/" (tymczasowy adres) lub "/" (domena),
+#   VITE_SUPABASE_URL              — adres projektu Supabase,
+#   VITE_SUPABASE_PUBLISHABLE_KEY  — klucz publiczny (publishable); publiczny z założenia, dane chroni RLS,
+#   HUMAN_MODEL_URL, HUMAN_MODEL_SHA256 — źródło modelu 3D (public/models/human.glb nie jest w repozytorium).
+# Sekrety nie są tu potrzebne i nie mogą tu trafić (zob. CLAUDE.md).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Vite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Kontrola konfiguracji publicznej
+        env:
+          BASE_PATH: ${{ vars.BASE_PATH }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          missing=()
+          for name in BASE_PATH VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Brak repository variables: ${missing[*]} (docs/supabase-setup.md, sekcja „GitHub”)."
+            exit 1
+          fi
+          case "$VITE_SUPABASE_PUBLISHABLE_KEY" in
+            sb_secret_*)
+              echo "::error::VITE_SUPABASE_PUBLISHABLE_KEY zawiera klucz secret. Usuń go i zmień klucz w panelu Supabase."
+              exit 1 ;;
+          esac
+
+      - name: Model 3D (public/models/human.glb)
+        env:
+          HUMAN_MODEL_URL: ${{ vars.HUMAN_MODEL_URL }}
+          HUMAN_MODEL_SHA256: ${{ vars.HUMAN_MODEL_SHA256 }}
+        run: |
+          model=public/models/human.glb
+          if [ -f "$model" ]; then
+            echo "Model jest w drzewie roboczym: $model"
+            exit 0
+          fi
+          if [ -z "$HUMAN_MODEL_URL" ]; then
+            echo "::error::Brak $model i brak zmiennej HUMAN_MODEL_URL. Model nie jest w repozytorium (licencja niepotwierdzona). Ustaw HUMAN_MODEL_URL i HUMAN_MODEL_SHA256 (docs/supabase-setup.md)."
+            exit 1
+          fi
+          if ! [[ "$HUMAN_MODEL_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::HUMAN_MODEL_SHA256 musi zawierać sumę SHA-256 (64 znaki hex, małe litery)."
+            exit 1
+          fi
+          mkdir -p "$(dirname "$model")"
+          curl -sSfL --proto '=https' --max-time 300 -o "$model" "$HUMAN_MODEL_URL"
+          echo "$HUMAN_MODEL_SHA256  $model" | sha256sum -c -
+
+      - name: Build
+        env:
+          BASE_PATH: ${{ vars.BASE_PATH }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Publikacja na GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,66 @@
+name: Wdrożenie Supabase (migracje i funkcja search)
+
+# Uruchamiany tylko ręcznie (Actions → „Wdrożenie Supabase” → Run workflow).
+# Środowisko `production` wymaga akceptacji właściciela (Settings → Environments → production →
+# Required reviewers; docs/supabase-setup.md, sekcja „GitHub”). Sekrety są sekretami środowiska
+# `production`, nie repozytorium, więc job bez akceptacji ich nie dostaje:
+#   SUPABASE_ACCESS_TOKEN — osobisty token Supabase tylko do tego workflow (unieważnij po incydencie),
+#   SUPABASE_PROJECT_REF  — identyfikator projektu,
+#   SUPABASE_DB_PASSWORD  — hasło bazy (CLI odczytuje je z env; nie trafia do logu).
+# Sekretów funkcji (OPENAI_API_KEY, ALLOWED_ORIGINS) ten workflow NIE ustawia: właściciel ustawia je
+# lokalnie (`npx supabase secrets set`). Workflow nie wykonuje `supabase config push`: ustawienia Auth
+# w chmurze są w panelu (config.toml opisuje lokalny stack).
+# Brak wyzwalaczy pull_request / pull_request_target: kod z forka nie dostaje sekretów.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: db push + functions deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Supabase CLI w wersji z package-lock.json (devDependency `supabase`).
+      - run: npm ci
+
+      - name: Kontrola sekretów
+        run: |
+          missing=()
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Brak sekretów środowiska production: ${missing[*]} (docs/supabase-setup.md)."
+            exit 1
+          fi
+
+      - name: supabase link
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Migracje do zastosowania (dry run)
+        run: npx supabase db push --linked --dry-run --skip-vault
+
+      - name: supabase db push
+        run: npx supabase db push --linked --skip-vault
+
+      - name: supabase functions deploy search
+        run: npx supabase functions deploy search --project-ref "$SUPABASE_PROJECT_REF" --use-api
